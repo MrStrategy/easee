@@ -126,9 +126,6 @@ sub EaseeWallbox_getCmdList ($$$) {
     my %cmdArray = %$commands;
     my $name     = $hash->{NAME};
 
-    #use Data::Dumper;
-    #Log3 ($name, 5, "Input: ". Dumper(\%cmdArray));
-
     #return, if cmd is valid
     return undef if ( defined($cmd) and defined( $cmdArray{$cmd} ) );
 
@@ -136,7 +133,6 @@ sub EaseeWallbox_getCmdList ($$$) {
     my $retVal;
     foreach my $mySet ( keys %cmdArray ) {
 
-        #Log3 ($name, 5, "Set:$mySet");
         #append set-command
         $retVal = $retVal . " " if ( defined($retVal) );
         $retVal = $retVal . $mySet;
@@ -149,10 +145,9 @@ sub EaseeWallbox_getCmdList ($$$) {
             if ( defined($myOpt) and ( length($myOpt) > 0 ) );
         $myOpt = "" if ( !defined($myOpt) );
 
-		#Logging makes me crazy...
-		#Log3 ($name, 5, "parse cmd-table - Set:$mySet, Option:$myOpt, RetVal:$retVal");
+#Logging makes me crazy...
+#Log3 ($name, 5, "parse cmd-table - Set:$mySet, Option:$myOpt, RetVal:$retVal");
     }
-
     if ( !defined($retVal) ) {
         $retVal = "error while parsing set-table";
     }
@@ -175,9 +170,9 @@ sub EaseeWallbox_Initialize($) {
     $hash->{Clients}   = ':EaseeWallbox:';
     $hash->{MatchList} = { '1:EaseeWallbox' => '^EaseeWallbox;.*' };
     $hash->{AttrList}
-        = 'generateDevices:yes,no '
-        . 'generateMobileDevices:yes,no '
-        . 'generateWeather:yes,no '
+        = 'expertMode:yes,no '
+        . 'ledStuff:yes,no '
+        . 'SmartCharging:true,false '
         . $readingFnAttributes;
 
     Log 3, "EaseeWallbox module initialized.";
@@ -192,7 +187,7 @@ sub EaseeWallbox_Define($$) {
 
     my $errmsg = '';
 
-	# Check parameter(s) - Must be min 4 in total (counts strings not purly parameter, interval is optional)
+# Check parameter(s) - Must be min 4 in total (counts strings not purly parameter, interval is optional)
     if ( int(@param) < 4 ) {
         $errmsg = return
             "syntax error: define <name> EaseeWallbox <username> <password> [Interval]";
@@ -255,9 +250,9 @@ sub EaseeWallbox_Define($$) {
 
     ##RemoveInternalTimer($hash);
 
-	#Call getZones with delay of 15 seconds, as all devices need to be loaded before timer triggers.
-	#Otherwise some error messages are generated due to auto created devices...
-	##InternalTimer(gettimeofday()+15, "EaseeWallbox_GetZones", $hash) if (defined $hash);
+#Call getZones with delay of 15 seconds, as all devices need to be loaded before timer triggers.
+#Otherwise some error messages are generated due to auto created devices...
+    ##InternalTimer(gettimeofday()+15, "EaseeWallbox_GetZones", $hash) if (defined $hash);
 
     ##Log3 $name, 1, sprintf("EaseeWallbox_Define %s: Starting timer with interval %s", $name, InternalVal($name,'INTERVAL', undef));
     ##InternalTimer(gettimeofday()+ InternalVal($name,'INTERVAL', undef), "EaseeWallbox_UpdateDueToTimer", $hash) if (defined $hash);
@@ -268,6 +263,167 @@ sub EaseeWallbox_Undef($$) {
     my ( $hash, $arg ) = @_;
 
     RemoveInternalTimer($hash);
+    return undef;
+}
+
+sub EaseeWallbox_Get($@) {
+    my ( $hash, $name, @args ) = @_;
+
+    return '"get EaseeWallbox" needs at least one argument'
+        if ( int(@args) < 1 );
+
+    my $opt = shift @args;
+
+    #create response, if cmd is wrong or gui asks
+    my $cmdTemp = EaseeWallbox_getCmdList( $hash, $opt, \%EaseeWallbox_gets );
+    return $cmdTemp if ( defined($cmdTemp) );
+
+    my $cmd = $args[0];
+    my $arg = $args[1];
+
+    if ( $opt eq "chargers" ) {
+
+        return EaseeWallbox_GetChargers($hash);
+
+    }
+    elsif ( $opt eq "profile" ) {
+
+        return EaseeWallbox_RefreshData($hash);
+
+    }
+    elsif ( $opt eq "config" ) {
+
+        return EaseeWallbox_GetChargerConfig($hash);
+
+    }
+    elsif ( $opt eq "sites" ) {
+
+        return EaseeWallbox_GetChargerSite($hash);
+
+    }
+    elsif ( $opt eq "update" ) {
+
+        Log3 $name, 3, "EaseeWallbox_Get $name: Updating all data";
+        $hash->{LOCAL} = 1;
+
+        EaseeWallbox_RequestChargerState($hash);
+        EaseeWallbox_RequestCurrentSession($hash);
+
+        delete $hash->{LOCAL};
+        return undef;
+
+    }
+    else {
+
+        my @cList = keys %EaseeWallbox_gets;
+        return "Unknown v2 argument $opt, choose one of "
+            . join( " ", @cList );
+    }
+}
+
+sub EaseeWallbox_Set($@) {
+    my ( $hash, $name, @param ) = @_;
+
+    return '"set $name" needs at least one argument' if ( int(@param) < 1 );
+
+    my $opt   = shift @param;
+    my $value = join( "", @param );
+
+    #create response, if cmd is wrong or gui asks
+    my $cmdTemp = EaseeWallbox_getCmdList( $hash, $opt, \%EaseeWallbox_sets );
+    return $cmdTemp if ( defined($cmdTemp) );
+
+    if ( $opt eq "startCharging" ) {
+        $hash->{LOCAL} = 1;
+        EaseeWallbox_ExecuteParameterlessCommand( $hash, "setStartCharging" );
+        delete $hash->{LOCAL};
+    }
+    elsif ( $opt eq 'stopCharging' ) {
+        $hash->{LOCAL} = 1;
+        EaseeWallbox_ExecuteParameterlessCommand( $hash, "setStopCharging" );
+        delete $hash->{LOCAL};
+
+    }
+    elsif ( $opt eq 'pauseCharging' ) {
+        $hash->{LOCAL} = 1;
+        EaseeWallbox_ExecuteParameterlessCommand( $hash, "setPauseCharging" );
+        delete $hash->{LOCAL};
+
+    }
+    elsif ( $opt eq 'resumeCharging' ) {
+        $hash->{LOCAL} = 1;
+        EaseeWallbox_ExecuteParameterlessCommand( $hash,
+            "setResumeCharging" );
+        delete $hash->{LOCAL};
+
+    }
+    elsif ( $opt eq 'toggleCharging' ) {
+        $hash->{LOCAL} = 1;
+        EaseeWallbox_ExecuteParameterlessCommand( $hash,
+            "setToggleCharging" );
+        delete $hash->{LOCAL};
+
+    }
+    elsif ( $opt eq "reboot" ) {
+        $hash->{LOCAL} = 1;
+        EaseeWallbox_ExecuteParameterlessCommand( $hash, "setReboot" );
+        delete $hash->{LOCAL};
+
+    }
+    elsif ( $opt eq 'enableSmartCharging' ) {
+        $hash->{LOCAL} = 1;
+        EaseeWallbox_SetCableLock( $hash, "setEnableSmartCharging" );
+        delete $hash->{LOCAL};
+
+    }
+    elsif ( $opt eq 'cableLock' ) {
+        my $status = shift @param;
+        Log3 $name, 3,
+            "EaseeWallbox: set $name: processing ($opt), new State: $status";
+        EaseeWallbox_SetCableLock( $hash, $status );
+        Log3 $name, 3, "EaseeWallbox $name" . ": " . "$opt finished\n";
+
+    }
+    elsif ( $opt eq 'pricePerKWH' ) {
+        my $price = shift @param;
+        Log3 $name, 3,
+            "EaseeWallbox: set $name: processing ($opt), new State: $price";
+        EaseeWallbox_SetPrice( $hash, $price );
+        Log3 $name, 3, "EaseeWallbox $name" . ": " . "$opt finished\n";
+
+    }
+    elsif ( $opt eq 'refreshToken' ) {
+        Log3 $name, 3, "EaseeWallbox: set $name: processing ($opt)";
+        EaseeWallbox_LoadToken($hash);
+        Log3 $name, 3, "EaseeWallbox $name" . ": " . "$opt finished\n";
+    }
+
+    elsif ( $opt eq "stop" ) {
+
+        RemoveInternalTimer($hash);
+        Log3 $name, 1,
+            "EaseeWallbox_Set $name: Stopped the timer to automatically update readings";
+        readingsSingleUpdate( $hash, 'state', 'Initialized', 0 );
+        return undef;
+
+    }
+    elsif ( $opt eq "interval" ) {
+
+        my $interval = shift @param;
+
+        $interval = 60 unless defined($interval);
+        if ( $interval < 5 ) { $interval = 5; }
+
+        Log3 $name, 1, "EaseeWallbox_Set $name: Set interval to" . $interval;
+
+        $hash->{INTERVAL} = $interval;
+    }
+    elsif ( $opt eq "presence" ) {
+
+        my $status = shift @param;
+        EaseeWallbox_UpdatePresenceStatus( $hash, $status );
+    }
+    readingsSingleUpdate( $hash, 'state', 'Initialized', 0 );
     return undef;
 }
 
@@ -498,170 +654,15 @@ sub EaseeWallbox_httpSimpleOperationOAuth($$$;$) {
     }
 }
 
-sub EaseeWallbox_Get($@) {
-    my ( $hash, $name, @args ) = @_;
-
-    return '"get EaseeWallbox" needs at least one argument'
-        if ( int(@args) < 1 );
-
-    my $opt = shift @args;
-
-    #create response, if cmd is wrong or gui asks
-    my $cmdTemp = EaseeWallbox_getCmdList( $hash, $opt, \%EaseeWallbox_gets );
-    return $cmdTemp if ( defined($cmdTemp) );
-
-    my $cmd = $args[0];
-    my $arg = $args[1];
-
-    if ( $opt eq "chargers" ) {
-
-        return EaseeWallbox_GetChargers($hash);
-
-    }
-    elsif ( $opt eq "profile" ) {
-
-        return EaseeWallbox_RefreshData($hash);
-
-    }
-    elsif ( $opt eq "config" ) {
-
-        return EaseeWallbox_GetChargerConfig($hash);
-
-    }
-    elsif ( $opt eq "sites" ) {
-
-        return EaseeWallbox_GetChargerSite($hash);
-
-    }
-    elsif ( $opt eq "update" ) {
-
-        Log3 $name, 3, "EaseeWallbox_Get $name: Updating all data";
-        $hash->{LOCAL} = 1;
-
-        EaseeWallbox_RequestChargerState($hash);
-        EaseeWallbox_RequestCurrentSession($hash);
-
-        delete $hash->{LOCAL};
-        return undef;
-
-    }
-    else {
-
-        my @cList = keys %EaseeWallbox_gets;
-        return "Unknown v2 argument $opt, choose one of "
-            . join( " ", @cList );
-    }
-}
-
-sub EaseeWallbox_Set($@) {
-    my ( $hash, $name, @param ) = @_;
-
-    return '"set $name" needs at least one argument' if ( int(@param) < 1 );
-
-    my $opt   = shift @param;
-    my $value = join( "", @param );
-
-    #create response, if cmd is wrong or gui asks
-    my $cmdTemp = EaseeWallbox_getCmdList( $hash, $opt, \%EaseeWallbox_sets );
-    return $cmdTemp if ( defined($cmdTemp) );
-
-    if ( $opt eq "startCharging" ) {
-        $hash->{LOCAL} = 1;
-        EaseeWallbox_ExecuteParameterlessCommand( $hash, "setStartCharging" );
-        delete $hash->{LOCAL};
-    }
-    elsif ( $opt eq 'stopCharging' ) {
-        $hash->{LOCAL} = 1;
-        EaseeWallbox_ExecuteParameterlessCommand( $hash, "setStopCharging" );
-        delete $hash->{LOCAL};
-
-    }
-    elsif ( $opt eq 'pauseCharging' ) {
-        $hash->{LOCAL} = 1;
-        EaseeWallbox_ExecuteParameterlessCommand( $hash, "setPauseCharging" );
-        delete $hash->{LOCAL};
-
-    }
-    elsif ( $opt eq 'resumeCharging' ) {
-        $hash->{LOCAL} = 1;
-        EaseeWallbox_ExecuteParameterlessCommand( $hash,
-            "setResumeCharging" );
-        delete $hash->{LOCAL};
-
-    }
-    elsif ( $opt eq 'toggleCharging' ) {
-        $hash->{LOCAL} = 1;
-        EaseeWallbox_ExecuteParameterlessCommand( $hash,
-            "setToggleCharging" );
-        delete $hash->{LOCAL};
-
-    }
-    elsif ( $opt eq "reboot" ) {
-        $hash->{LOCAL} = 1;
-        EaseeWallbox_ExecuteParameterlessCommand( $hash, "setReboot" );
-        delete $hash->{LOCAL};
-
-    }
-    elsif ( $opt eq 'enableSmartCharging' ) {
-        $hash->{LOCAL} = 1;
-        EaseeWallbox_SetCableLock( $hash, "setEnableSmartCharging" );
-        delete $hash->{LOCAL};
-
-    }
-    elsif ( $opt eq 'cableLock' ) {
-        my $status = shift @param;
-        Log3 $name, 3,
-            "EaseeWallbox: set $name: processing ($opt), new State: $status";
-        EaseeWallbox_SetCableLock( $hash, $status );
-        Log3 $name, 3, "EaseeWallbox $name" . ": " . "$opt finished\n";
-
-    }
-    elsif ( $opt eq 'pricePerKWH' ) {
-        my $price = shift @param;
-        Log3 $name, 3,
-            "EaseeWallbox: set $name: processing ($opt), new State: $price";
-        EaseeWallbox_SetPrice( $hash, $price );
-        Log3 $name, 3, "EaseeWallbox $name" . ": " . "$opt finished\n";
-
-    }
-    elsif ( $opt eq 'refreshToken' ) {
-        Log3 $name, 3, "EaseeWallbox: set $name: processing ($opt)";
-        EaseeWallbox_LoadToken($hash);
-        Log3 $name, 3, "EaseeWallbox $name" . ": " . "$opt finished\n";
-    }
-
-    elsif ( $opt eq "stop" ) {
-
-        RemoveInternalTimer($hash);
-        Log3 $name, 1,
-            "EaseeWallbox_Set $name: Stopped the timer to automatically update readings";
-        readingsSingleUpdate( $hash, 'state', 'Initialized', 0 );
-        return undef;
-
-    }
-    elsif ( $opt eq "interval" ) {
-
-        my $interval = shift @param;
-
-        $interval = 60 unless defined($interval);
-        if ( $interval < 5 ) { $interval = 5; }
-
-        Log3 $name, 1, "EaseeWallbox_Set $name: Set interval to" . $interval;
-
-        $hash->{INTERVAL} = $interval;
-    }
-    elsif ( $opt eq "presence" ) {
-
-        my $status = shift @param;
-        EaseeWallbox_UpdatePresenceStatus( $hash, $status );
-    }
-    readingsSingleUpdate( $hash, 'state', 'Initialized', 0 );
-    return undef;
-}
-
 sub EaseeWallbox_ExecuteParameterlessCommand($$) {
     my ( $hash, $template ) = @_;
-    my $name = $hash->{NAME};
+    EaseeWallbox_ExecuteCommand($hash, 'POST', $template, undef)
+}
+
+sub EaseeWallbox_ExecuteCommand($@) {
+    my ( $hash, $method, $template, $message ) = @_;
+    my $name        = $hash->{NAME};
+    my $urlTemplate = $url{$template};
 
     if ( not defined $hash ) {
         Log3 'EaseeWallbox', 1,
@@ -669,90 +670,46 @@ sub EaseeWallbox_ExecuteParameterlessCommand($$) {
         return undef;
     }
 
-    my $chargerId = ReadingsVal( $name, 'charger_id', undef );
-    if ( not defined $chargerId ) {
-        Log3 'EaseeWallbox', 1,
-            "Error on EaseeWallbox_ExecuteCommand. Missing charger_id. Please ensure basic data is available.";
-        return undef;
+    #Check if chargerID is required in URL and replace or alert.
+    if ( $urlTemplate =~ m/#ChargerID#/ ) {
+        my $chargerId = ReadingsVal( $name, 'charger_id', undef );
+        if ( not defined $chargerId ) {
+            Log3 'EaseeWallbox', 1,
+                "Error on EaseeWallbox_ExecuteCommand. Missing charger_id. Please ensure basic data is available.";
+            return undef;
+        }
+        $urlTemplate =~ s/#ChargerID#/$chargerId/g;
     }
 
-    Log3 $name, 4,
-        "EaseeWallbox_ExecuteCommand will call Easee API for non-blocking value update. Name: $name";
-    Log3 $name, 3, "Starting charge process.";
+    #Check if siteID is required in URL and replace or alert.
+    if ( $urlTemplate =~ m/#SiteID#/ ) {
+        my $siteId = ReadingsVal( $name, 'site_id', undef );
+        if ( not defined $siteId ) {
+            Log3 'EaseeWallbox', 1,
+                "Error on EaseeWallbox_ExecuteCommand. Missing site_id. Please ensure basic data is available.";
+            return undef;
+        }
+        $urlTemplate =~ s/#SiteID#/$siteId/g;         
+    }
 
-    my $writeTemplate = $url{$template};
-    $writeTemplate =~ s/#ChargerID#/$chargerId/g;
-
-    my $d = EaseeWallbox_httpSimpleOperationOAuth( $hash, $writeTemplate,
-        'POST', "" );
+    Log3 $name, 4, "EaseeWallbox_ExecuteCommand will call Easee API for blocking value update. Name: $name";  
+    my $d = EaseeWallbox_httpSimpleOperationOAuth( $hash, $urlTemplate, $method, encode_json \%$message );
 }
 
 sub EaseeWallbox_SetCableLock($$) {
     my ( $hash, $value ) = @_;
-    my $name = $hash->{NAME};
-
-    if ( not defined $hash ) {
-        Log3 'EaseeWallbox', 1,
-            "Error on EaseeWallbox_SetCableLock. Missing hash variable";
-        return undef;
-    }
-
-    my $chargerId = ReadingsVal( $name, 'charger_id', undef );
-    if ( not defined $chargerId ) {
-        Log3 'EaseeWallbox', 1,
-            "Error on EaseeWallbox_SetCableLock. Missing charger_id. Please ensure basic data is available.";
-        return undef;
-    }
-
-    Log3 $name, 4,
-        "EaseeWallbox_SetCableLock will call Easee API for non-blocking value update. Name: $name";
-    Log3 $name, 3, "Starting charge process.";
-
-    my $readTemplate     = $url{"setCableLockState"};
-    my $CurrentTokenData = EaseeWallbox_LoadToken($hash);
-
-    $readTemplate =~ s/#ChargerID#/$chargerId/g;
-
     my %message;
     $message{'state'} = $value;
-
-    my $d = EaseeWallbox_httpSimpleOperationOAuth( $hash, $readTemplate,
-        'POST', encode_json \%message );
+    EaseeWallbox_ExecuteCommand($hash, "POST", "setCableLockState", \%message);
 }
 
 sub EaseeWallbox_SetPrice($$) {
     my ( $hash, $value ) = @_;
-    my $name = $hash->{NAME};
-
-    if ( not defined $hash ) {
-        Log3 'EaseeWallbox', 1,
-            "Error on EaseeWallbox_SetPrice. Missing hash variable";
-        return undef;
-    }
-
-    my $siteId = ReadingsVal( $name, 'site_id', undef );
-    if ( not defined $siteId ) {
-        Log3 'EaseeWallbox', 1,
-            "Error on EaseeWallbox_SetPrice. Missing charger_id. Please ensure basic data is available.";
-        return undef;
-    }
-
-    Log3 $name, 4,
-        "EaseeWallbox_SetPrice will call Easee API for non-blocking value update. Name: $name";
-    Log3 $name, 3, "Starting charge process.";
-
-    my $readTemplate     = $url{"setChargingPrice"};
-    my $CurrentTokenData = EaseeWallbox_LoadToken($hash);
-
-    $readTemplate =~ s/#SiteID#/$siteId/g;
-
     my %message;
     $message{'currencyId'} = "EUR";
     $message{'vat'}        = "19";
     $message{'costPerKWh'} = $value;
-
-    my $d = EaseeWallbox_httpSimpleOperationOAuth( $hash, $readTemplate,
-        'POST', encode_json \%message );
+    EaseeWallbox_ExecuteCommand($hash, "POST", "setChargingPrice", \%message);
 }
 
 sub EaseeWallbox_Attr(@) {
@@ -1108,8 +1065,8 @@ sub EaseeWallbox_UpdateDueToTimer($) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
 
-	#local allows call of function without adding new timer.
-	#must be set before call ($hash->{LOCAL} = 1) and removed after (delete $hash->{LOCAL};)
+#local allows call of function without adding new timer.
+#must be set before call ($hash->{LOCAL} = 1) and removed after (delete $hash->{LOCAL};)
     if ( !$hash->{LOCAL} ) {
         RemoveInternalTimer($hash);
 
@@ -1270,32 +1227,32 @@ sub EaseeWallbox_decrypt($) {
     <i>EaseeWallbox</i> implements an interface to the EaseeWallbox cloud. The plugin can be used to read and write temperature and settings from or to the EaseeWallbox cloud. The communication is based on the reengineering of the protocol done by Stephen C. Phillips. See <a href="http://blog.scphillips.com/posts/2017/01/the-EaseeWallbox-api-v2/">his blog</a> for more details. Not all functions are implemented within this FHEM extension. By now the plugin is capable to interact with the so called zones (rooms) and the registered devices. The devices cannot be controlled directly. All interaction - like setting a temperature - must be done via the zone and not the device. This means all configuration like the registration of new devices or the assignment of a device to a room must be done using the EaseeWallbox app or EaseeWallbox website directly. Once the configuration is completed this plugin can be used. This device is the 'bridge device' like a HueBridge or a CUL. Per zone or device a dedicated device of type 'EaseeWallbox' will be created.
     The following features / functionalities are defined by now when using EaseeWallbox and EaseeWallboxs:
     <ul>
-    	<li>EaseeWallbox Bridge
-    	<br><ul>
-    		<li>Manages the communication towards the EaseeWallbox cloud environment and documents the status in several readings like which data was refreshed, when it was rerefershed, etc.</li>
-    		<li><b>Overall Presence status</b> Indicates wether at least one mobile device is 'at Home'</li>
-    		<li><b>Overall Air Comfort</b> Indicates the air comfort of the whole home.</li>
-    	</ul></li>
-    	<li>Zone (basically a room)
-    	<br><ul>
-    		<li><b>Temperature Management:</b> Displays the current temperature, allows to set the desired temperature including the EaseeWallbox modes which can do this manually or automatically</li>
-    		<li><b>Zone Air Comfort</b> Indicates the air comfort of the specific room.</li>
-    	</ul></li>
-    	<li>Device
-    	   <br><ul>
-    		<li><b>Connection State:</b> Indicate when the actual device was seen the last time</li>
-    		<li><b>Battery Level</b> Indicates the current battery level of the device.</li>
-       		<li><b>Find device</b> Output a 'Hi' message on the display to identify the specific device</li>
-    	</ul></li>
-    	<li>Mobile Device<
-    	  <br><ul>
-    		<li><b>Device Configration:</b> Displays information about the device type and the current configuration (view only)</li>
-    		<li><b>Presence status</b> Indicates if the specific mobile device is Home or Away.</li>
-    	</ul></li>
-    	<li>Weather
-    	  <br><ul>
-    		<li>Displays information about the ouside waether and the solar intensity (cloud source, not actually measured).</li>
-    	</ul></li>
+        <li>EaseeWallbox Bridge
+        <br><ul>
+            <li>Manages the communication towards the EaseeWallbox cloud environment and documents the status in several readings like which data was refreshed, when it was rerefershed, etc.</li>
+            <li><b>Overall Presence status</b> Indicates wether at least one mobile device is 'at Home'</li>
+            <li><b>Overall Air Comfort</b> Indicates the air comfort of the whole home.</li>
+        </ul></li>
+        <li>Zone (basically a room)
+        <br><ul>
+            <li><b>Temperature Management:</b> Displays the current temperature, allows to set the desired temperature including the EaseeWallbox modes which can do this manually or automatically</li>
+            <li><b>Zone Air Comfort</b> Indicates the air comfort of the specific room.</li>
+        </ul></li>
+        <li>Device
+           <br><ul>
+            <li><b>Connection State:</b> Indicate when the actual device was seen the last time</li>
+            <li><b>Battery Level</b> Indicates the current battery level of the device.</li>
+            <li><b>Find device</b> Output a 'Hi' message on the display to identify the specific device</li>
+        </ul></li>
+        <li>Mobile Device<
+          <br><ul>
+            <li><b>Device Configration:</b> Displays information about the device type and the current configuration (view only)</li>
+            <li><b>Presence status</b> Indicates if the specific mobile device is Home or Away.</li>
+        </ul></li>
+        <li>Weather
+          <br><ul>
+            <li>Displays information about the ouside waether and the solar intensity (cloud source, not actually measured).</li>
+        </ul></li>
     </ul>
     <br>
     While previous versions of this plugin were using plain authentication encoding the username and the password directly in the URL this version now uses OAuth2 which does a secure authentication and uses security tokens afterwards. This is a huge security improvement. The implementation is based on code written by Philipp (Psycho160). Thanks for sharing.
@@ -1397,7 +1354,7 @@ sub EaseeWallbox_decrypt($) {
     <br>
     <a name="EaseeWallboxreadings"></a>
     <b>Generated Readings/Events:</b>
-		<br>
+        <br>
     <ul>
         <ul>
             <li><b>DeviceCount</b>
