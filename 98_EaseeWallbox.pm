@@ -252,8 +252,6 @@ sub EaseeWallbox_Define($$) {
     EaseeWallbox_UpdateBaseData($hash);
     EaseeWallbox_RefreshData($hash);
 
-    InternalTimer(gettimeofday()+15, "EaseeWallbox_GetZones", $hash) if (defined $hash);
-
     Log3 $name, 1, sprintf("EaseeWallbox_Define %s: Starting timer with interval %s", $name, InternalVal($name,'INTERVAL', undef));
     InternalTimer(gettimeofday()+ InternalVal($name,'INTERVAL', undef), "EaseeWallbox_UpdateDueToTimer", $hash) if (defined $hash);
     return undef;
@@ -348,10 +346,12 @@ sub EaseeWallbox_Set($@) {
 }
 
 sub EaseeWallbox_RefreshData($){
-    my $hash          = shift;    
+    my $hash     = shift;    
+    my $name     = $hash->{NAME};
     EaseeWallbox_GetChargerSite($hash);    
     EaseeWallbox_RequestChargerState($hash);
     EaseeWallbox_RequestCurrentSession($hash);
+    readingsSingleUpdate( $hash, "state", sprintf('%s (%.2f)<br/>Current Session: %.2f kWH (%.2f€)', ReadingsVal($name,"operationMode","N/A"), ReadingsVal($name,"power","0"), ReadingsVal($name,"kWhInSession","0"), ReadingsVal($name,"session_chargingCost","0")), 1 );
 }
 
 sub EaseeWallbox_UpdateBaseData($){
@@ -686,10 +686,8 @@ sub EaseeWallbox_GetChargers($) {
         my $chargerId = $charger->{id};
         readingsBulkUpdate( $hash, "charger_id",   $chargerId );
         readingsBulkUpdate( $hash, "charger_name", $charger->{name} );
-        readingsBulkUpdate( $hash, "charger_isTemporary",
-            $charger->{isTemporary} );
-        readingsBulkUpdate( $hash, "charger_createdOn",
-            $charger->{createdOn} );
+        #readingsBulkUpdate( $hash, "charger_isTemporary", $charger->{isTemporary} );
+        #readingsBulkUpdate( $hash, "charger_createdOn", $charger->{createdOn} );
         readingsEndUpdate( $hash, 1 );
 
         $readTemplate = $url{"getChargerDetails"};
@@ -706,9 +704,9 @@ sub EaseeWallbox_GetChargers($) {
         }
         else {
             readingsBeginUpdate($hash);
-            readingsBulkUpdate( $hash, "charger_product",  $d->{product} );
-            readingsBulkUpdate( $hash, "charger_pincode",  $d->{pinCode} );
-            readingsBulkUpdate( $hash, "charger_unitType", $d->{unitType} );
+            readingsBulkUpdate( $hash, "product",  $d->{product} );
+            readingsBulkUpdate( $hash, "pincode",  $d->{pinCode} );
+            readingsBulkUpdate( $hash, "unitType", $d->{unitType} );
             readingsEndUpdate( $hash, 1 );
         }
 
@@ -747,69 +745,69 @@ sub EaseeWallbox_GetChargerConfig($) {
         readingsBulkUpdate( $hash, "charger_isEnabled", $d->{isEnabled} );
         readingsBulkUpdate(
             $hash,
-            "charger_lockCablePermanently",
+            "lockCablePermanently",
             $d->{lockCablePermanently}
         );
         readingsBulkUpdate(
             $hash,
-            "charger_authorizationRequired",
+            "authorizationRequired",
             $d->{authorizationRequired}
         );
-        readingsBulkUpdate( $hash, "charger_remoteStartRequired",
+        readingsBulkUpdate( $hash, "remoteStartRequired",
             $d->{remoteStartRequired} );
-        readingsBulkUpdate( $hash, "charger_smartButtonEnabled",
+        readingsBulkUpdate( $hash, "smartButtonEnabled",
             $d->{smartButtonEnabled} );
-        readingsBulkUpdate( $hash, "charger_wiFiSSID", $d->{wiFiSSID} );
-        readingsBulkUpdate( $hash, "charger_offlineChargingMode",
-            $d->{offlineChargingMode} );
-        readingsBulkUpdate( $hash, "charger_circuitMaxCurrentP1",
-            $d->{circuitMaxCurrentP1} );
-        readingsBulkUpdate( $hash, "charger_circuitMaxCurrentP2",
-            $d->{circuitMaxCurrentP2} );
-        readingsBulkUpdate( $hash, "charger_circuitMaxCurrentP3",
-            $d->{circuitMaxCurrentP3} );
-        readingsBulkUpdate( $hash, "charger_enableIdleCurrent",
-            $d->{enableIdleCurrent} );
-        readingsBulkUpdate(
-            $hash,
-            "charger_limitToSinglePhaseCharging",
-            $d->{limitToSinglePhaseCharging}
-        );
+        readingsBulkUpdate( $hash, "wiFiSSID", $d->{wiFiSSID} );
+        #readingsBulkUpdate( $hash, "charger_offlineChargingMode",
+        #    $d->{offlineChargingMode} );
+        #readingsBulkUpdate( $hash, "charger_circuitMaxCurrentP1",
+        #    $d->{circuitMaxCurrentP1} );
+        #readingsBulkUpdate( $hash, "charger_circuitMaxCurrentP2",
+        #    $d->{circuitMaxCurrentP2} );
+        #readingsBulkUpdate( $hash, "charger_circuitMaxCurrentP3",
+        #    $d->{circuitMaxCurrentP3} );
+        #readingsBulkUpdate( $hash, "charger_enableIdleCurrent",
+        #    $d->{enableIdleCurrent} );
+        #readingsBulkUpdate(
+        #    $hash,
+        #    "charger_limitToSinglePhaseCharging",
+        #    $d->{limitToSinglePhaseCharging}
+        #);
         readingsBulkUpdate( $hash, "charger_phaseModeId", $d->{phaseMode} );
         readingsBulkUpdate( $hash, "charger_phaseMode",
             $phaseMode{ $d->{phaseMode} } );
-        readingsBulkUpdate( $hash, "charger_localNodeType",
-            $d->{localNodeType} );
+        #readingsBulkUpdate( $hash, "charger_localNodeType",
+        #    $d->{localNodeType} );
         readingsBulkUpdate(
             $hash,
-            "charger_localAuthorizationRequired",
+            "localAuthorizationRequired",
             $d->{localAuthorizationRequired}
         );
-        readingsBulkUpdate( $hash, "charger_localRadioChannel",
-            $d->{localRadioChannel} );
-        readingsBulkUpdate( $hash, "charger_localShortAddress",
-            $d->{localShortAddress} );
-        readingsBulkUpdate(
-            $hash,
-            "charger_localParentAddrOrNumOfNodes",
-            $d->{localParentAddrOrNumOfNodes}
-        );
-        readingsBulkUpdate(
-            $hash,
-            "charger_localPreAuthorizeEnabled",
-            $d->{localPreAuthorizeEnabled}
-        );
-        readingsBulkUpdate(
-            $hash,
-            "charger_allowOfflineTxForUnknownId",
-            $d->{allowOfflineTxForUnknownId}
-        );
-        readingsBulkUpdate( $hash, "charger_maxChargerCurrent",
+        #readingsBulkUpdate( $hash, "charger_localRadioChannel",
+        #    $d->{localRadioChannel} );
+        #readingsBulkUpdate( $hash, "charger_localShortAddress",
+        #    $d->{localShortAddress} );
+        #readingsBulkUpdate(
+        #    $hash,
+        #    "charger_localParentAddrOrNumOfNodes",
+        #    $d->{localParentAddrOrNumOfNodes}
+        #);
+        #readingsBulkUpdate(
+        #    $hash,
+        #    "charger_localPreAuthorizeEnabled",
+        #    $d->{localPreAuthorizeEnabled}
+        #);
+        #readingsBulkUpdate(
+        #    $hash,
+        #    "charger_allowOfflineTxForUnknownId",
+        #    $d->{allowOfflineTxForUnknownId}
+        #);
+        readingsBulkUpdate( $hash, "maxChargerCurrent",
             $d->{maxChargerCurrent} );
-        readingsBulkUpdate( $hash, "charger_ledStripBrightness",
+        readingsBulkUpdate( $hash, "ledStripBrightness",
             $d->{ledStripBrightness} );
-        readingsBulkUpdate( $hash, "charger_chargingSchedule",
-            $d->{chargingSchedule} );
+        #readingsBulkUpdate( $hash, "chargingSchedule",
+        #    $d->{chargingSchedule} );
 
         readingsEndUpdate( $hash, 1 );
 
@@ -845,7 +843,6 @@ sub EaseeWallbox_GetChargerSite($) {
 
     }
     else {
-
         readingsBeginUpdate($hash);
         readingsBulkUpdate( $hash, "site_key",    $d->{siteKey} );
         readingsBulkUpdate( $hash, "site_id",     $d->{id} );
@@ -854,9 +851,9 @@ sub EaseeWallbox_GetChargerSite($) {
             $d->{costPerKwhExcludeVat} );
         readingsBulkUpdate( $hash, "cost_vat",          $d->{vat} );
         readingsBulkUpdate( $hash, "cost_currency",     $d->{currencyId} );
-        readingsBulkUpdate( $hash, "site_ratedCurrent", $d->{ratedCurrent} );
-        readingsBulkUpdate( $hash, "site_createdOn",    $d->{createdOn} );
-        readingsBulkUpdate( $hash, "site_updatedOn",    $d->{updatedOn} );
+        #readingsBulkUpdate( $hash, "site_ratedCurrent", $d->{ratedCurrent} );
+        #readingsBulkUpdate( $hash, "site_createdOn",    $d->{createdOn} );
+        #readingsBulkUpdate( $hash, "site_updatedOn",    $d->{updatedOn} );
         readingsEndUpdate( $hash, 1 );
         return undef;
     }
@@ -954,26 +951,26 @@ sub EaseeWallbox_RequestChargerStateCallback($) {
         Log3 $name, 5, 'Decoded: ' . Dumper($d);
 
         readingsBeginUpdate($hash);
-        readingsBulkUpdate( $hash, "actual_operationModeCode",
+        readingsBulkUpdate( $hash, "operationModeCode",
             $d->{chargerOpMode} );
-        readingsBulkUpdate( $hash, "actual_operationMode",
+        readingsBulkUpdate( $hash, "operationMode",
             $operationMode{ $d->{chargerOpMode} } );
 
-        readingsBulkUpdate( $hash, "actual_power", $d->{totalPower} );
-        readingsBulkUpdate( $hash, "actual_kWhInSession",
+        readingsBulkUpdate( $hash, "power", $d->{totalPower} );
+        readingsBulkUpdate( $hash, "kWhInSession",
             $d->{sessionEnergy} );
-        readingsBulkUpdate( $hash, "actual_phase",       $d->{outputPhase} );
-        readingsBulkUpdate( $hash, "actual_latestPulse", $d->{latestPulse} );
-        readingsBulkUpdate( $hash, "actual_current", $d->{outputCurrent} );
-        readingsBulkUpdate( $hash, "actual_dynamicCurrent",
+        readingsBulkUpdate( $hash, "phase",       $d->{outputPhase} );
+        readingsBulkUpdate( $hash, "latestPulse", $d->{latestPulse} );
+        readingsBulkUpdate( $hash, "current", $d->{outputCurrent} );
+        readingsBulkUpdate( $hash, "dynamicCurrent",
             $d->{dynamicChargerCurrent} );
 
         readingsBulkUpdate(
             $hash,
-            "actual_reasonCodeForNoCurrent",
+            "reasonCodeForNoCurrent",
             $d->{reasonForNoCurrent}
         );
-        readingsBulkUpdate( $hash, "actual_reasonForNoCurrent",
+        readingsBulkUpdate( $hash, "reasonForNoCurrent",
             $reasonForNoCurrent{ $d->{reasonForNoCurrent} } );
 
         readingsBulkUpdate( $hash, "errorCode",      $d->{errorCode} );
@@ -986,7 +983,6 @@ sub EaseeWallbox_RequestChargerStateCallback($) {
         readingsBulkUpdate( $hash, "wifi_apEnabled", $d->{wiFiAPEnabled} );
         readingsBulkUpdate( $hash, "cell_rssi",      $d->{cellRSSI} );
         readingsEndUpdate( $hash, 1 );
-
         return undef;
     } or do {
         Log3 $name, 5, 'Failure decoding: ' . $@;
@@ -1148,179 +1144,6 @@ sub EaseeWallbox_decrypt($) {
 =pod
 =begin html
 
-<a name="EaseeWallbox"></a>
-<h3>EaseeWallbox</h3>
-<ul>
-    <i>EaseeWallbox</i> implements an interface to the EaseeWallbox cloud. The plugin can be used to read and write temperature and settings from or to the EaseeWallbox cloud. The communication is based on the reengineering of the protocol done by Stephen C. Phillips. See <a href="http://blog.scphillips.com/posts/2017/01/the-EaseeWallbox-api-v2/">his blog</a> for more details. Not all functions are implemented within this FHEM extension. By now the plugin is capable to interact with the so called zones (rooms) and the registered devices. The devices cannot be controlled directly. All interaction - like setting a temperature - must be done via the zone and not the device. This means all configuration like the registration of new devices or the assignment of a device to a room must be done using the EaseeWallbox app or EaseeWallbox website directly. Once the configuration is completed this plugin can be used. This device is the 'bridge device' like a HueBridge or a CUL. Per zone or device a dedicated device of type 'EaseeWallbox' will be created.
-    The following features / functionalities are defined by now when using EaseeWallbox and EaseeWallboxs:
-    <ul>
-        <li>EaseeWallbox Bridge
-        <br><ul>
-            <li>Manages the communication towards the EaseeWallbox cloud environment and documents the status in several readings like which data was refreshed, when it was rerefershed, etc.</li>
-            <li><b>Overall Presence status</b> Indicates wether at least one mobile device is 'at Home'</li>
-            <li><b>Overall Air Comfort</b> Indicates the air comfort of the whole home.</li>
-        </ul></li>
-        <li>Zone (basically a room)
-        <br><ul>
-            <li><b>Temperature Management:</b> Displays the current temperature, allows to set the desired temperature including the EaseeWallbox modes which can do this manually or automatically</li>
-            <li><b>Zone Air Comfort</b> Indicates the air comfort of the specific room.</li>
-        </ul></li>
-        <li>Device
-           <br><ul>
-            <li><b>Connection State:</b> Indicate when the actual device was seen the last time</li>
-            <li><b>Battery Level</b> Indicates the current battery level of the device.</li>
-            <li><b>Find device</b> Output a 'Hi' message on the display to identify the specific device</li>
-        </ul></li>
-        <li>Mobile Device<
-          <br><ul>
-            <li><b>Device Configration:</b> Displays information about the device type and the current configuration (view only)</li>
-            <li><b>Presence status</b> Indicates if the specific mobile device is Home or Away.</li>
-        </ul></li>
-        <li>Weather
-          <br><ul>
-            <li>Displays information about the ouside waether and the solar intensity (cloud source, not actually measured).</li>
-        </ul></li>
-    </ul>
-    <br>
-    While previous versions of this plugin were using plain authentication encoding the username and the password directly in the URL this version now uses OAuth2 which does a secure authentication and uses security tokens afterwards. This is a huge security improvement. The implementation is based on code written by Philipp (Psycho160). Thanks for sharing.
-    <br>
-    <br>
-    <a name="EaseeWallboxdefine"></a>
-    <b>Define</b>
-    <ul>
-        <code>define &lt;name&gt; EaseeWallbox &lt;username&gt; &lt;password&gt; &lt;interval&gt;</code>
-        <br>
-        <br> Example: <code>define EaseeWallboxBridge EaseeWallbox mail@provider.com somepassword 120</code>
-        <br>
-        <br> The username and password must match the username and password used on the EaseeWallbox website. Please be aware that username and password are stored and send as plain text. They are visible in FHEM user interface. It is recommended to create a dedicated user account for the FHEM integration. The EaseeWallbox extension needs to pull the data from the EaseeWallbox website. The 'Interval' value defines how often the value is refreshed.
-    </ul>
-    <br>
-    <b>Set</b>
-    <br>
-    <ul>
-        <code>set &lt;name&gt; &lt;option&gt;</code>
-        <br>
-        <br> The <i>set</i> command just offers very limited options. If can be used to control the refresh mechanism. The plugin only evaluates the command. Any additional information is ignored.
-        <br>
-        <br> Options:
-        <ul>
-            <li><i>interval</i>
-                <br> Sets how often the values shall be refreshed. This setting overwrites the value set during define.</li>
-            <li><i>start</i>
-                <br> (Re)starts the automatic refresh. Refresh is autostarted on define but can be stopped using stop command. Using the start command FHEM will start polling again.</li>
-            <li><i>stop</i>
-                <br> Stops the automatic polling used to refresh all values.</li>
-            <li><i>presence</i>
-                <br> Sets the presence value for the whole EaseeWallbox account. You can set the status to HOME or AWAY and depending on the status all devices will chnange their confiration between home and away mode. If you're using the mobile devices and the EaseeWallbox premium feature using geofencing to determine home and away status you should not use this function.</li>
-        </ul>
-    </ul>
-    <br>
-    <a name="EaseeWallboxget"></a>
-    <b>Get</b>
-    <br>
-    <ul>
-        <code>get &lt;name&gt; &lt;option&gt;</code>
-        <br>
-        <br> You can <i>get</i> the major information from the EaseeWallbox cloud.
-        <br>
-        <br> Options:
-        <ul>
-            <li><i>home</i>
-                <br> Gets the home identifier from EaseeWallbox cloud. The home identifier is required for all further actions towards the EaseeWallbox cloud. Currently the FHEM extension only supports a single home. If you have more than one home only the first home is loaded.
-                <br/><b>This function is automatically executed once when a new EaseeWallbox device is defined.</b></li>
-            <li><i>zones</i>
-                <br> Every zone in the EaseeWallbox cloud represents a room. This command gets all zones defined for the current home. Per zone a new FHEM device is created. The device can be used to display and overwrite the current temperatures. This command can always be executed to update the list of defined zones. It will not touch any existing zone but add new zones added since last update.
-                <br/><b>This function is automatically executed once when a new EaseeWallbox device is defined.</b></li>
-            <li><i>update</i>
-                <br/> Updates the values of:
-                <br/>
-                <ul>
-                    <li>All EaseeWallbox zones</li>
-                    <li>The presence status of the whole EaseeWallbox account</li>
-                    <li>All mobile devices - if attribute <i>generateMobileDevices</i> is set to true</li>
-                    <li>All devices - if attribute <i>generateDevices</i> is set to true</li>
-                    <li>The weather device - if attribute <i>generateWeather</i> is set to true</li>
-                </ul>
-                This command triggers a single update not a continuous refresh of the values.
-            </li>
-            <li><i>devices</i>
-                <br/> Fetches all devices from EaseeWallbox cloud and creates one EaseeWallbox instance per fetched device. This command will only be executed if the attribute <i>generateDevices</i> is set to <i>yes</i>. If the attribute is set to <i>no</i> or not existing an error message will be displayed and no communication towards EaseeWallbox will be done. This command can always be executed to update the list of defined devices. It will not touch existing devices but add new ones. Devices will not be updated automatically as there are no values continuously changing.
-            </li>
-            <li><i>mobile_devices</i>
-                <br/> Fetches all defined mobile devices from EaseeWallbox cloud and creates one EaseeWallbox instance per mobile device. This command will only be executed if the attribute <i>generateMobileDevices</i> is set to <i>yes</i>. If the attribute is set to <i>no</i> or not existing an error message will be displayed and no communication towards EaseeWallbox will be done. This command can always be executed to update the list of defined mobile devices. It will not touch existing devices but add new ones.
-            </li>
-            <li><i>weather</i>
-                <br/> Creates or updates an additional device for the data bridge containing the weather data provided by EaseeWallbox. This command will only be executed if the attribute <i>generateWeather</i> is set to <i>yes</i>. If the attribute is set to <i>no</i> or not existing an error message will be displayed and no communication towards EaseeWallbox will be done.
-            </li>
-        </ul>
-    </ul>
-    <br>
-    <a name="EaseeWallboxattr"></a>
-    <b>Attributes</b>
-    <ul>
-        <code>attr &lt;name&gt; &lt;attribute&gt; &lt;value&gt;</code>
-        <br>
-        <br> You can change the behaviour of the EaseeWallbox Device.
-        <br>
-        <br> Attributes:
-        <ul>
-            <li><i>generateDevices</i>
-                <br> By default the devices are not fetched and displayed in FHEM as they don't offer much functionality. The functionality is handled by the zones not by the devices. But the devices offers an identification function <i>sayHi</i> to show a message on the specific display. If this function is required the Devices can be generated. Therefor the attribute <i>generateDevices</i> must be set to <i>yes</i>
-                <br/><b>If this attribute is set to <i>no</i> or if the attribute is not existing no devices will be generated..</b>
-            </li>
-            <li><i>generateMobileDevices</i>
-                <br> By default the mobile devices are not fetched and displayed in FHEM as most users already have a person home recognition. If EaseeWallbox shall be used to identify if a mobile device is at home this can be done using the mobile devices. In this case the mobile devices can be generated. Therefor the attribute <i>generateMobileDevices</i> must be set to <i>yes</i>
-                <br/><b>If this attribute is set to <i>no</i> or if the attribute is not existing no mobile devices will be generated..</b>
-            </li>
-            <li><i>generateWeather</i>
-                <br> By default no weather channel is generated. If you want to use the weather as it is defined by the EaseeWallbox system for your specific environment you must set this attribute. If the attribute <i>generateWeather</i> is set to <i>yes</i> an additional weather channel can be generated.
-                <br/><b>If this attribute is set to <i>no</i> or if the attribute is not existing no Devices will be generated..</b>
-            </li>
-        </ul>
- </ul>
-    <br>
-    <a name="EaseeWallboxreadings"></a>
-    <b>Generated Readings/Events:</b>
-        <br>
-    <ul>
-        <ul>
-            <li><b>DeviceCount</b>
-                <br> Indicates how many devices (hardware devices provided by EaseeWallbox) are registered in the linked EaseeWallbox Account.
-                <br/> This reading will only be available / updated if the attribute <i>generateDevices</i> is set to <i>yes</i>.
-            </li>
-            <li><b>LastUpdate_Devices</b>
-                <br> Indicates when the last successful request to update the hardware devices (EaseeWallboxs) was send to the EaseeWallbox API. his reading will only be available / updated if the attribute <i>generateDevices</i> is set to <i>yes</i>.
-            </li>
-            <li><b>HomeID</b>
-                <br> Unique identifier for your EaseeWallbox account instance. All devices are linked to your homeID and the homeID required for almost all EaseeWallbox API requests.
-            </li>
-            <li><b>HomeName</b>
-                <br> Name of your EaseeWallbox home as you have configured it in your EaseeWallbox account.
-            </li>
-            <li><b>Presence</b>
-                <br> The current presence status of your home. The status can be HOME or AWAY and is valid for the whole home and all devices and zones linked to this home. The Presence reading can be influences by the <i>set presence</i> command or based on geofencing using mobile devices.
-            </li>
-            <li><b>airComfort_freshness</b>
-                <br> The overall fresh air indicator for your home. Represents a summary of the single indicators per zone / room.
-            </li>
-            <li><b>airComfort_lastWindowOpen</b>
-                <br> Inidcates the last time an open window was detected by EaseeWallbox to refresh the air within the home.
-            </li>
-            <li><b>LastUpdate_AirComfort</b>
-                <br> Indicates when the last successful request to update the air comfort was send to the EaseeWallbox API.
-            </li>
-            <li><b>LastUpdate_MobileDevices</b>
-                <br> Indicates when the last successful request to update the mobile devices was send to the EaseeWallbox API. his reading will only be available / updated if the attribute <i>generateMobileDevices</i> is set to <i>yes</i>.
-            </li>
-            <li><b>LastUpdate_Weather</b>
-                <br> Indicates when the last successful request to update the weather was send to the EaseeWallbox API. his reading will only be available / updated if the attribute <i>generateWeather</i> is set to <i>yes</i>.
-            </li>
-            <li><b>LastUpdate_Zones</b>
-                <br> Indicates when the last successful request to update the zone / room data was send to the EaseeWallbox API.
-            </li>
-        </ul>
-    </ul>
-</ul>
 
 =end html
 
