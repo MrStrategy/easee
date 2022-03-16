@@ -32,7 +32,9 @@ my %EaseeWallbox_sets = (
     enableSmartCharging      => "true,false",
     overrideChargingSchedule => "",
     pairRfidTag              => "",
-    pricePerKWH              => ""
+    pricePerKWH              => "",
+    activateTimer            => "",
+    deactivateTimer          => "",
 );
 
 my %url = (
@@ -247,16 +249,13 @@ sub EaseeWallbox_Define($$) {
     readingsSingleUpdate( $hash, 'state', 'Undefined', 0 );
 
     #Initial load of data
+    EaseeWallbox_UpdateBaseData($hash);
     EaseeWallbox_RefreshData($hash);
 
-    ##RemoveInternalTimer($hash);
+    InternalTimer(gettimeofday()+15, "EaseeWallbox_GetZones", $hash) if (defined $hash);
 
-#Call getZones with delay of 15 seconds, as all devices need to be loaded before timer triggers.
-#Otherwise some error messages are generated due to auto created devices...
-    ##InternalTimer(gettimeofday()+15, "EaseeWallbox_GetZones", $hash) if (defined $hash);
-
-    ##Log3 $name, 1, sprintf("EaseeWallbox_Define %s: Starting timer with interval %s", $name, InternalVal($name,'INTERVAL', undef));
-    ##InternalTimer(gettimeofday()+ InternalVal($name,'INTERVAL', undef), "EaseeWallbox_UpdateDueToTimer", $hash) if (defined $hash);
+    Log3 $name, 1, sprintf("EaseeWallbox_Define %s: Starting timer with interval %s", $name, InternalVal($name,'INTERVAL', undef));
+    InternalTimer(gettimeofday()+ InternalVal($name,'INTERVAL', undef), "EaseeWallbox_UpdateDueToTimer", $hash) if (defined $hash);
     return undef;
 }
 
@@ -279,28 +278,14 @@ sub EaseeWallbox_Get($@) {
     my $cmdTemp = EaseeWallbox_getCmdList( $hash, $opt, \%EaseeWallbox_gets );
     return $cmdTemp if ( defined($cmdTemp) );
 
-    my $cmd = $args[0];
-    my $arg = $args[1];
-
-    if ($opt eq 'baseData') {
-        EaseeWallbox_GetChargers($hash);
-        EaseeWallbox_GetChargerConfig($hash);
-        EaseeWallbox_GetChargerSite($hash);
-        EaseeWallbox_RefreshData($hash);
-
-    } elsif ( $opt eq "update" ) {
-        Log3 $name, 3, "EaseeWallbox_Get $name: Updating all data";
-        $hash->{LOCAL} = 1;
-        EaseeWallbox_RequestChargerState($hash);
-        EaseeWallbox_RequestCurrentSession($hash);
-        delete $hash->{LOCAL};
-        return undef;        
-    } else {
-        return EaseeWallbox_GetChargers($hash)     if $opt eq "chargers";
-        return EaseeWallbox_RefreshData($hash)     if $opt eq "profile";
-        return EaseeWallbox_GetChargerConfig($hash)     if $opt eq "config";
-        return EaseeWallbox_GetChargerSite($hash)     if $opt eq "sites";
-    }
+    $hash->{LOCAL} = 1;
+    EaseeWallbox_GetChargers($hash)         if $opt eq "chargers";
+    EaseeWallbox_GetChargerConfig($hash)    if $opt eq "config";
+    EaseeWallbox_GetChargerSite($hash)      if $opt eq "sites";
+    EaseeWallbox_RefreshData($hash)         if $opt eq "update";
+    EaseeWallbox_UpdateBaseData($hash)      if $opt eq 'baseData';        
+    delete $hash->{LOCAL};
+    return undef;        
 }
 
 sub EaseeWallbox_Set($@) {
@@ -315,12 +300,22 @@ sub EaseeWallbox_Set($@) {
     my $cmdTemp = EaseeWallbox_getCmdList( $hash, $opt, \%EaseeWallbox_sets );
     return $cmdTemp if ( defined($cmdTemp) );
 
-    if ( $opt eq "stop" ) {
+    if ( $opt eq "deactivateTimer" ) {
         RemoveInternalTimer($hash);
         Log3 $name, 1,
             "EaseeWallbox_Set $name: Stopped the timer to automatically update readings";
         readingsSingleUpdate( $hash, 'state', 'Initialized', 0 );
         return undef;
+    }
+     elsif ( $opt eq "activateTimer" ) {
+        #Update once manually and then start the timer
+        RemoveInternalTimer($hash);
+        $hash->{LOCAL} = 1;
+        EaseeWallbox_RefreshData($hash);
+        delete $hash->{LOCAL};      
+        InternalTimer(gettimeofday()+ InternalVal($name,'INTERVAL', undef), "EaseeWallbox_UpdateDueToTimer", $hash);
+        readingsSingleUpdate($hash,'state','Started',0);  
+        Log3 $name, 1, sprintf("EaseeWallbox_Set %s: Updated readings and started timer to automatically update readings with interval %s", $name, InternalVal($name,'INTERVAL', undef));
     }
     elsif ( $opt eq "interval" ) {
         my $interval = shift @param;
@@ -351,6 +346,20 @@ sub EaseeWallbox_Set($@) {
     readingsSingleUpdate( $hash, 'state', 'Initialized', 0 );
     return undef;
 }
+
+sub EaseeWallbox_RefreshData($){
+    my $hash          = shift;    
+    EaseeWallbox_GetChargerSite($hash);    
+    EaseeWallbox_RequestChargerState($hash);
+    EaseeWallbox_RequestCurrentSession($hash);
+}
+
+sub EaseeWallbox_UpdateBaseData($){
+    my $hash          = shift;    
+    EaseeWallbox_GetChargers($hash);
+    EaseeWallbox_GetChargerConfig($hash);
+    EaseeWallbox_RefreshData($hash);    
+}        
 
 sub EaseeWallbox_LoadToken {
     my $hash          = shift;
@@ -1001,14 +1010,7 @@ sub EaseeWallbox_UpdateDueToTimer($) {
             "EaseeWallbox_UpdateDueToTimer", $hash );
         readingsSingleUpdate( $hash, 'state', 'Polling', 0 );
     }
-
-    #EaseeWallbox_RequestZoneUpdate($hash);
-    #EaseeWallbox_RequestAirComfortUpdate($hash);
-    #EaseeWallbox_RequestMobileDeviceUpdate($hash);
-    #EaseeWallbox_RequestWeatherUpdate($hash);
-
-    #EaseeWallbox_RequestDeviceUpdate($hash);
-    #EaseeWallbox_RequestPresenceUpdate($hash);
+    EaseeWallbox_RefreshData($hash);
 }
 
 sub EaseeWallbox_RequestCurrentSession($) {
