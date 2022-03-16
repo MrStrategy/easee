@@ -333,95 +333,38 @@ sub EaseeWallbox_Set($@) {
     my $cmdTemp = EaseeWallbox_getCmdList( $hash, $opt, \%EaseeWallbox_sets );
     return $cmdTemp if ( defined($cmdTemp) );
 
-    if ( $opt eq "startCharging" ) {
-        $hash->{LOCAL} = 1;
-        EaseeWallbox_ExecuteParameterlessCommand( $hash, "setStartCharging" );
-        delete $hash->{LOCAL};
-    }
-    elsif ( $opt eq 'stopCharging' ) {
-        $hash->{LOCAL} = 1;
-        EaseeWallbox_ExecuteParameterlessCommand( $hash, "setStopCharging" );
-        delete $hash->{LOCAL};
-
-    }
-    elsif ( $opt eq 'pauseCharging' ) {
-        $hash->{LOCAL} = 1;
-        EaseeWallbox_ExecuteParameterlessCommand( $hash, "setPauseCharging" );
-        delete $hash->{LOCAL};
-
-    }
-    elsif ( $opt eq 'resumeCharging' ) {
-        $hash->{LOCAL} = 1;
-        EaseeWallbox_ExecuteParameterlessCommand( $hash,
-            "setResumeCharging" );
-        delete $hash->{LOCAL};
-
-    }
-    elsif ( $opt eq 'toggleCharging' ) {
-        $hash->{LOCAL} = 1;
-        EaseeWallbox_ExecuteParameterlessCommand( $hash,
-            "setToggleCharging" );
-        delete $hash->{LOCAL};
-
-    }
-    elsif ( $opt eq "reboot" ) {
-        $hash->{LOCAL} = 1;
-        EaseeWallbox_ExecuteParameterlessCommand( $hash, "setReboot" );
-        delete $hash->{LOCAL};
-
-    }
-    elsif ( $opt eq 'enableSmartCharging' ) {
-        $hash->{LOCAL} = 1;
-        EaseeWallbox_SetCableLock( $hash, "setEnableSmartCharging" );
-        delete $hash->{LOCAL};
-
-    }
-    elsif ( $opt eq 'cableLock' ) {
-        my $status = shift @param;
-        Log3 $name, 3,
-            "EaseeWallbox: set $name: processing ($opt), new State: $status";
-        EaseeWallbox_SetCableLock( $hash, $status );
-        Log3 $name, 3, "EaseeWallbox $name" . ": " . "$opt finished\n";
-
-    }
-    elsif ( $opt eq 'pricePerKWH' ) {
-        my $price = shift @param;
-        Log3 $name, 3,
-            "EaseeWallbox: set $name: processing ($opt), new State: $price";
-        EaseeWallbox_SetPrice( $hash, $price );
-        Log3 $name, 3, "EaseeWallbox $name" . ": " . "$opt finished\n";
-
-    }
-    elsif ( $opt eq 'refreshToken' ) {
-        Log3 $name, 3, "EaseeWallbox: set $name: processing ($opt)";
-        EaseeWallbox_LoadToken($hash);
-        Log3 $name, 3, "EaseeWallbox $name" . ": " . "$opt finished\n";
-    }
-
-    elsif ( $opt eq "stop" ) {
-
+    if ( $opt eq "stop" ) {
         RemoveInternalTimer($hash);
         Log3 $name, 1,
             "EaseeWallbox_Set $name: Stopped the timer to automatically update readings";
         readingsSingleUpdate( $hash, 'state', 'Initialized', 0 );
         return undef;
-
     }
     elsif ( $opt eq "interval" ) {
-
         my $interval = shift @param;
 
         $interval = 60 unless defined($interval);
         if ( $interval < 5 ) { $interval = 5; }
 
         Log3 $name, 1, "EaseeWallbox_Set $name: Set interval to" . $interval;
-
         $hash->{INTERVAL} = $interval;
-    }
-    elsif ( $opt eq "presence" ) {
+    } else {
+        $hash->{LOCAL} = 1;
+        EaseeWallbox_ExecuteParameterlessCommand( $hash, "setStartCharging" )        if $opt eq "startCharging";
+        EaseeWallbox_ExecuteParameterlessCommand( $hash, "setStopCharging" )         if $opt eq 'stopCharging';  
+        EaseeWallbox_ExecuteParameterlessCommand( $hash, "setPauseCharging" )        if $opt eq 'pauseCharging';
+        EaseeWallbox_ExecuteParameterlessCommand( $hash, "setResumeCharging" )       if $opt eq 'resumeCharging';
+        EaseeWallbox_ExecuteParameterlessCommand( $hash, "setToggleCharging" )       if $opt eq 'toggleCharging';      
+        EaseeWallbox_ExecuteParameterlessCommand( $hash, "setUpdateFirmware" )       if $opt eq 'updateFirmware';
+        EaseeWallbox_ExecuteParameterlessCommand( $hash, "setOverrideChargingSchedule" )       if $opt eq 'overrideChargingSchedule';
+        EaseeWallbox_ExecuteParameterlessCommand( $hash, "setPairRFIDTag" )       if $opt eq 'pairRfidTag';     
 
-        my $status = shift @param;
-        EaseeWallbox_UpdatePresenceStatus( $hash, $status );
+        EaseeWallbox_ExecuteParameterlessCommand( $hash, "setReboot" )               if $opt eq 'reboot';
+        EaseeWallbox_ExecuteParameterlessCommand( $hash, "toBeDone" )                if $opt eq 'enableSmartCharging';
+        EaseeWallbox_SetCableLock( $hash, shift @param )                             if $opt eq 'cableLock';
+        EaseeWallbox_SetPrice( $hash, shift @param )                                 if $opt eq 'pricePerKWH';
+        EaseeWallbox_LoadToken($hash)                                                if $opt eq 'refreshToken';   
+        delete $hash->{LOCAL};
     }
     readingsSingleUpdate( $hash, 'state', 'Initialized', 0 );
     return undef;
