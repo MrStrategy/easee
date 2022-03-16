@@ -11,6 +11,7 @@ use JSON;
 my %EaseeWallbox_gets = (
     update   => "noArg",
     health   => "noArg",
+    baseData => "noArg",
     chargers => "noArg",
     sites    => "noArg",
     profile  => "noArg",
@@ -281,43 +282,24 @@ sub EaseeWallbox_Get($@) {
     my $cmd = $args[0];
     my $arg = $args[1];
 
-    if ( $opt eq "chargers" ) {
+    if ($opt eq 'baseData') {
+        EaseeWallbox_GetChargers($hash);
+        EaseeWallbox_GetChargerConfig($hash);
+        EaseeWallbox_GetChargerSite($hash);
+        EaseeWallbox_RefreshData($hash);
 
-        return EaseeWallbox_GetChargers($hash);
-
-    }
-    elsif ( $opt eq "profile" ) {
-
-        return EaseeWallbox_RefreshData($hash);
-
-    }
-    elsif ( $opt eq "config" ) {
-
-        return EaseeWallbox_GetChargerConfig($hash);
-
-    }
-    elsif ( $opt eq "sites" ) {
-
-        return EaseeWallbox_GetChargerSite($hash);
-
-    }
-    elsif ( $opt eq "update" ) {
-
+    } elsif ( $opt eq "update" ) {
         Log3 $name, 3, "EaseeWallbox_Get $name: Updating all data";
         $hash->{LOCAL} = 1;
-
         EaseeWallbox_RequestChargerState($hash);
         EaseeWallbox_RequestCurrentSession($hash);
-
         delete $hash->{LOCAL};
-        return undef;
-
-    }
-    else {
-
-        my @cList = keys %EaseeWallbox_gets;
-        return "Unknown v2 argument $opt, choose one of "
-            . join( " ", @cList );
+        return undef;        
+    } else {
+        return EaseeWallbox_GetChargers($hash)     if $opt eq "chargers";
+        return EaseeWallbox_RefreshData($hash)     if $opt eq "profile";
+        return EaseeWallbox_GetChargerConfig($hash)     if $opt eq "config";
+        return EaseeWallbox_GetChargerSite($hash)     if $opt eq "sites";
     }
 }
 
@@ -1008,8 +990,8 @@ sub EaseeWallbox_UpdateDueToTimer($) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
 
-#local allows call of function without adding new timer.
-#must be set before call ($hash->{LOCAL} = 1) and removed after (delete $hash->{LOCAL};)
+    #local allows call of function without adding new timer.
+    #must be set before call ($hash->{LOCAL} = 1) and removed after (delete $hash->{LOCAL};)
     if ( !$hash->{LOCAL} ) {
         RemoveInternalTimer($hash);
 
