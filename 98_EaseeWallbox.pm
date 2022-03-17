@@ -388,7 +388,7 @@ sub EaseeWallbox_LoadToken {
             . localtime($tokenLifeTime);
 
         # if token is about to expire, refresh him
-        if ( ( $tokenLifeTime - 45 ) < gettimeofday() ) {
+        if ( ( $tokenLifeTime - 3700 ) < gettimeofday() ) {
             Log3 $name, 5,
                 "EaseeWallbox $name" . ": "
                 . "Token will expire soon, refreshing";
@@ -449,7 +449,7 @@ sub EaseeWallbox_NewTokenRequest {
             # token lifetime management
             if ( defined($decoded_data) ) {
                 $hash->{TOKEN_LIFETIME}
-                    = gettimeofday() + $decoded_data->{'expires_in'};
+                    = gettimeofday() + $decoded_data->{'expiresIn'};
             }
             $hash->{TOKEN_LIFETIME_HR} = localtime( $hash->{TOKEN_LIFETIME} );
             Log3 $name, 5,
