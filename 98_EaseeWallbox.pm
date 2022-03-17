@@ -37,7 +37,7 @@ my %EaseeWallbox_sets = (
     deactivateTimer          => "",
 );
 
-my %url = (
+my %EaseeWallbox_urls = (
     getOAuthToken   => 'https://api.easee.cloud/api/accounts/login',
     getRefreshToken => 'https://api.easee.cloud/api/accounts/refresh_token',
     getProfile      => 'https://api.easee.cloud/api/accounts/profile',
@@ -86,7 +86,7 @@ my %url = (
     setChargingPrice => 'https://api.easee.cloud/api/sites/#SiteID#/price',
 );
 
-my %reasonForNoCurrent = (
+my %EaseeWallbox_reasonsForNoCurrent = (
     0 => 'OK',                               #charger is allocated current
     1 => 'MaxCircuitCurrentTooLow',
     2 => 'MaxDynamicCircuitCurrentTooLow',
@@ -106,13 +106,13 @@ my %reasonForNoCurrent = (
     56  => 'ChargerInErrorState',
     100 => 'Undefined'
 );
-my %phaseMode = (
+my %EaseeWallbox_phaseModes = (
     1 => 'Locked to single phase',
     2 => 'Auto',
     3 => 'Locked to three phase',
 );
 
-my %operationMode = (
+my %EaseeWallbox_operationModes = (
     1 => "Standby",
     2 => "Paused",
     3 => 'Charging',
@@ -148,8 +148,7 @@ sub EaseeWallbox_getCmdList ($$$) {
             if ( defined($myOpt) and ( length($myOpt) > 0 ) );
         $myOpt = "" if ( !defined($myOpt) );
 
-#Logging makes me crazy...
-#Log3 ($name, 5, "parse cmd-table - Set:$mySet, Option:$myOpt, RetVal:$retVal");
+        Log3 ($name, 5, "parse cmd-table - Set:$mySet, Option:$myOpt, RetVal:$retVal");
     }
     if ( !defined($retVal) ) {
         $retVal = "error while parsing set-table";
@@ -190,7 +189,7 @@ sub EaseeWallbox_Define($$) {
 
     my $errmsg = '';
 
-# Check parameter(s) - Must be min 4 in total (counts strings not purly parameter, interval is optional)
+    # Check parameter(s) - Must be min 4 in total (counts strings not purly parameter, interval is optional)
     if ( int(@param) < 4 ) {
         $errmsg = return
             "syntax error: define <name> EaseeWallbox <username> <password> [Interval]";
@@ -413,7 +412,7 @@ sub EaseeWallbox_NewTokenRequest {
     };
 
     my $param = {
-        url     => $url{getOAuthToken},
+        url     => $EaseeWallbox_urls{getOAuthToken},
         header  => { "Content-Type" => "application/json" },
         method  => 'POST',
         timeout => 5,
@@ -478,7 +477,7 @@ sub EaseeWallbox_TokenRefresh {
     };
 
     my $param = {
-        url     => $url{getRefreshToken},
+        url     => $EaseeWallbox_urls{getRefreshToken},
         header  => { "Content-Type" => "application/json" },
         method  => 'POST',
         timeout => 5,
@@ -596,7 +595,7 @@ sub EaseeWallbox_ExecuteParameterlessCommand($$) {
 sub EaseeWallbox_ExecuteCommand($@) {
     my ( $hash, $method, $template, $message ) = @_;
     my $name        = $hash->{NAME};
-    my $urlTemplate = $url{$template};
+    my $urlTemplate = $EaseeWallbox_urls{$template};
 
     if ( not defined $hash ) {
         Log3 'EaseeWallbox', 1,
@@ -661,7 +660,7 @@ sub EaseeWallbox_GetChargers($) {
         return $msg;
     }
 
-    my $readTemplate = $url{"getChargers"};
+    my $readTemplate = $EaseeWallbox_urls{"getChargers"};
 
     my $d = EaseeWallbox_httpSimpleOperationOAuth( $hash, $readTemplate,
         'GET' );
@@ -690,7 +689,7 @@ sub EaseeWallbox_GetChargers($) {
         #readingsBulkUpdate( $hash, "charger_createdOn", $charger->{createdOn} );
         readingsEndUpdate( $hash, 1 );
 
-        $readTemplate = $url{"getChargerDetails"};
+        $readTemplate = $EaseeWallbox_urls{"getChargerDetails"};
         $readTemplate =~ s/#ChargerID#/$chargerId/g;
         $d = EaseeWallbox_httpSimpleOperationOAuth( $hash, $readTemplate,
             'GET' );
@@ -727,7 +726,7 @@ sub EaseeWallbox_GetChargerConfig($) {
         return $msg;
     }
 
-    my $readTemplate = $url{"getChargerConfiguration"};
+    my $readTemplate = $EaseeWallbox_urls{"getChargerConfiguration"};
     $readTemplate =~ s/#ChargerID#/$chargerId/g;
     my $d = EaseeWallbox_httpSimpleOperationOAuth( $hash, $readTemplate,
         'GET' );
@@ -775,7 +774,7 @@ sub EaseeWallbox_GetChargerConfig($) {
         #);
         readingsBulkUpdate( $hash, "charger_phaseModeId", $d->{phaseMode} );
         readingsBulkUpdate( $hash, "charger_phaseMode",
-            $phaseMode{ $d->{phaseMode} } );
+            $EaseeWallbox_phaseModes{ $d->{phaseMode} } );
         #readingsBulkUpdate( $hash, "charger_localNodeType",
         #    $d->{localNodeType} );
         readingsBulkUpdate(
@@ -830,7 +829,7 @@ sub EaseeWallbox_GetChargerSite($) {
         return $msg;
     }
 
-    my $readTemplate = $url{"getChargerSite"};
+    my $readTemplate = $EaseeWallbox_urls{"getChargerSite"};
     $readTemplate =~ s/#ChargerID#/$chargerId/g;
     my $d = EaseeWallbox_httpSimpleOperationOAuth( $hash, $readTemplate,
         'GET' );
@@ -954,7 +953,7 @@ sub EaseeWallbox_RequestChargerStateCallback($) {
         readingsBulkUpdate( $hash, "operationModeCode",
             $d->{chargerOpMode} );
         readingsBulkUpdate( $hash, "operationMode",
-            $operationMode{ $d->{chargerOpMode} } );
+            $EaseeWallbox_operationModes{ $d->{chargerOpMode} } );
 
         readingsBulkUpdate( $hash, "power", $d->{totalPower} );
         readingsBulkUpdate( $hash, "kWhInSession",
@@ -971,7 +970,7 @@ sub EaseeWallbox_RequestChargerStateCallback($) {
             $d->{reasonForNoCurrent}
         );
         readingsBulkUpdate( $hash, "reasonForNoCurrent",
-            $reasonForNoCurrent{ $d->{reasonForNoCurrent} } );
+            $EaseeWallbox_reasonsForNoCurrent{ $d->{reasonForNoCurrent} } );
 
         readingsBulkUpdate( $hash, "errorCode",      $d->{errorCode} );
         readingsBulkUpdate( $hash, "fatalErrorCode", $d->{fatalErrorCode} );
@@ -1031,7 +1030,7 @@ sub EaseeWallbox_RequestCurrentSession($) {
     Log3 $name, 4,
         "EaseeWallbox_RequestCurrentSession Called for non-blocking value update. Name: $name";
 
-    my $readTemplate = $url{"getCurrentSession"};
+    my $readTemplate = $EaseeWallbox_urls{"getCurrentSession"};
     $readTemplate =~ s/#ChargerID#/$chargerId/g;
 
     my $CurrentTokenData = EaseeWallbox_LoadToken($hash);
@@ -1079,7 +1078,7 @@ sub EaseeWallbox_RequestChargerState($) {
     Log3 $name, 4,
         "EaseeWallbox_RequestChargerState Called for non-blocking value update. Name: $name";
 
-    my $readTemplate = $url{"getChargerState"};
+    my $readTemplate = $EaseeWallbox_urls{"getChargerState"};
     $readTemplate =~ s/#ChargerID#/$chargerId/g;
 
     my $CurrentTokenData = EaseeWallbox_LoadToken($hash);
