@@ -358,7 +358,7 @@ sub Get {
     WriteToCloudAPI($hash, 'getChargers', 'GET')         if $opt eq "chargers";
     WriteToCloudAPI($hash, 'getChargers', 'GET')         if $opt eq "config";
     WriteToCloudAPI($hash, 'getChargers', 'GET')         if $opt eq "sites";
-    WriteToCloudAPI($hash, 'getChargers', 'GET')         if $opt eq "update";
+    RefreshData($hash)                                   if $opt eq "update";
     WriteToCloudAPI($hash, 'getChargers', 'GET')         if $opt eq 'baseData';        
     delete $hash->{LOCAL};
     return undef;  
@@ -381,6 +381,15 @@ sub Attr {
     my ( $cmd, $name, $attrName, $attrVal ) = @_;
     return;
 }
+
+sub RefreshData{
+    my $hash     = shift;    
+    my $name     = $hash->{NAME};
+    WriteToCloudAPI($hash, 'getChargerSite', 'GET');
+    WriteToCloudAPI($hash, 'getChargerState', 'GET');
+    WriteToCloudAPI($hash, 'getCurrentSession', 'GET');
+}
+
 
 sub WriteToCloudAPI {
     my $hash   = shift;
@@ -564,8 +573,63 @@ sub ResponseHandling {
                 #    $d->{chargingSchedule} );
                 readingsBulkUpdate( $hash, "lastResponse", 'OK - getReaderConfig', 1);
                 readingsEndUpdate( $hash, 1 );
-
                 return undef;
+            }
+
+            if($param->{dpoint} eq 'getCurrentSession')
+            {
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate( $hash, "session_energy", $d->{sessionEnergy} );
+                readingsBulkUpdate( $hash, "session_start",  $d->{sessionStart} );
+                readingsBulkUpdate( $hash, "session_end",    $d->{sessionEnd} );
+                readingsBulkUpdate( $hash, "session_chargeDurationInSeconds", $d->{chargeDurationInSeconds} );
+                readingsBulkUpdate( $hash, "session_firstEnergyTransfer",$d->{firstEnergyTransferPeriodStart} );
+                readingsBulkUpdate( $hash, "session_lastEnergyTransfer", $d->{lastEnergyTransferPeriodStart} );
+                readingsBulkUpdate( $hash, "session_pricePerKWH", $d->{pricePrKwhIncludingVat} );
+                readingsBulkUpdate( $hash, "session_chargingCost", $d->{costIncludingVat} );
+                readingsBulkUpdate( $hash, "session_id", $d->{sessionId} );
+                readingsEndUpdate( $hash, 1 );
+                return undef;
+            }
+
+            if($param->{dpoint} eq 'getChargerSite')
+            {
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate( $hash, "site_key",    $d->{siteKey} );
+                readingsBulkUpdate( $hash, "cost_perKWh", $d->{costPerKWh} );
+                readingsBulkUpdate( $hash, "cost_perKwhExcludeVat", $d->{costPerKwhExcludeVat} );
+                readingsBulkUpdate( $hash, "cost_vat",          $d->{vat} );
+                readingsBulkUpdate( $hash, "cost_currency",     $d->{currencyId} );
+                #readingsBulkUpdate( $hash, "site_ratedCurrent", $d->{ratedCurrent} );
+                #readingsBulkUpdate( $hash, "site_createdOn",    $d->{createdOn} );
+                #readingsBulkUpdate( $hash, "site_updatedOn",    $d->{updatedOn} );
+                readingsEndUpdate( $hash, 1 );
+                return undef;            
+            }
+
+            if($param->{dpoint} eq 'getChargerState')
+            {
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate( $hash, "operationModeCode", $d->{chargerOpMode} );
+                readingsBulkUpdate( $hash, "operationMode", $operationModes{ $d->{chargerOpMode} } );
+                readingsBulkUpdate( $hash, "power", $d->{totalPower} );
+                readingsBulkUpdate( $hash, "kWhInSession", $d->{sessionEnergy} );
+                readingsBulkUpdate( $hash, "phase",       $d->{outputPhase} );
+                readingsBulkUpdate( $hash, "latestPulse", $d->{latestPulse} );
+                readingsBulkUpdate( $hash, "current", $d->{outputCurrent} );
+                readingsBulkUpdate( $hash, "dynamicCurrent", $d->{dynamicChargerCurrent} );
+                readingsBulkUpdate( $hash, "reasonCodeForNoCurrent", $d->{reasonForNoCurrent} );
+                readingsBulkUpdate( $hash, "reasonForNoCurrent", $reasonsForNoCurrent{ $d->{reasonForNoCurrent} } );
+                readingsBulkUpdate( $hash, "errorCode",      $d->{errorCode} );
+                readingsBulkUpdate( $hash, "fatalErrorCode", $d->{fatalErrorCode} );
+                readingsBulkUpdate( $hash, "lifetimeEnergy", $d->{lifetimeEnergy} );
+                readingsBulkUpdate( $hash, "online",         $d->{isOnline} );
+                readingsBulkUpdate( $hash, "voltage",        $d->{voltage} );
+                readingsBulkUpdate( $hash, "wifi_rssi",      $d->{wiFiRSSI} );
+                readingsBulkUpdate( $hash, "wifi_apEnabled", $d->{wiFiAPEnabled} );
+                readingsBulkUpdate( $hash, "cell_rssi",      $d->{cellRSSI} );
+                readingsEndUpdate( $hash, 1 );
+                return undef;            
             }
 
             readingsSingleUpdate( $hash, "lastResponse", 'OK - Action '. $d->{commandId}, 1 )       if defined $d->{commandId};
