@@ -105,11 +105,7 @@ GP_Export(
 my %gets = (
     update   => "noArg",
     health   => "noArg",
-    baseData => "noArg",
-    chargers => "noArg",
-    sites    => "noArg",
-    profile  => "noArg",
-    config   => "noArg",
+    charger => "noArg",
 );
 
 my %sets = (
@@ -327,11 +323,10 @@ sub Define {
     readingsSingleUpdate( $hash, 'state', 'Undefined', 0 );
 
     #Initial load of data
-    #EaseeWallbox_UpdateBaseData($hash);
-    #EaseeWallbox_RefreshData($hash);
+    WriteToCloudAPI($hash, 'getChargers', 'GET');
 
     Log3 $name, 1, sprintf("EaseeWallbox_Define %s: Starting timer with interval %s", $name, InternalVal($name,'INTERVAL', undef));
-    #InternalTimer(gettimeofday()+ InternalVal($name,'INTERVAL', undef), "EaseeWallbox_UpdateDueToTimer", $hash) if (defined $hash);
+    InternalTimer(gettimeofday()+ InternalVal($name,'INTERVAL', undef), "UpdateDueToTimer", $hash) if (defined $hash);
     return undef;
 }
 
@@ -355,11 +350,8 @@ sub Get {
     return $cmdTemp if ( defined($cmdTemp) );
 
     $hash->{LOCAL} = 1;
-    WriteToCloudAPI($hash, 'getChargers', 'GET')         if $opt eq "chargers";
-    WriteToCloudAPI($hash, 'getChargers', 'GET')         if $opt eq "config";
-    WriteToCloudAPI($hash, 'getChargers', 'GET')         if $opt eq "sites";
-    RefreshData($hash)                                   if $opt eq "update";
-    WriteToCloudAPI($hash, 'getChargers', 'GET')         if $opt eq 'baseData';        
+    WriteToCloudAPI($hash, 'getChargers', 'GET')         if $opt eq "charger";
+    RefreshData($hash)                                   if $opt eq "update";      
     delete $hash->{LOCAL};
     return undef;  
 }
@@ -375,6 +367,63 @@ sub Set {
     #create response, if cmd is wrong or gui asks
     my $cmdTemp = _GetCmdList( $hash, $opt, \%sets );
     return $cmdTemp if ( defined($cmdTemp) );
+
+    if ( $opt eq "deactivateTimer" ) {
+        RemoveInternalTimer($hash);
+        Log3 $name, 1,
+            "EaseeWallbox_Set $name: Stopped the timer to automatically update readings";
+        readingsSingleUpdate( $hash, 'state', 'Initialized', 0 );
+        return undef;
+    }
+     elsif ( $opt eq "activateTimer" ) {
+        #Update once manually and then start the timer
+        RemoveInternalTimer($hash);
+        $hash->{LOCAL} = 1;
+        RefreshData($hash);
+        delete $hash->{LOCAL};      
+        InternalTimer(gettimeofday()+ InternalVal($name,'INTERVAL', undef), "UpdateDueToTimer", $hash);
+        readingsSingleUpdate($hash,'state','Started',0);  
+        Log3 $name, 1, sprintf("EaseeWallbox_Set %s: Updated readings and started timer to automatically update readings with interval %s", $name, InternalVal($name,'INTERVAL', undef));
+    }
+    elsif ( $opt eq "interval" ) {
+        my $interval = shift @param;
+
+        $interval = 60 unless defined($interval);
+        if ( $interval < 5 ) { $interval = 5; }
+
+        Log3 $name, 1, "EaseeWallbox_Set $name: Set interval to" . $interval;
+        $hash->{INTERVAL} = $interval;
+    }
+     elsif ( $opt eq "cableLock" ) {
+        my %message;
+        $message{'state'} = $value;
+        WriteToCloudAPI($hash, 'setCableLockState', 'POST', \%message)
+    } 
+    elsif ( $opt eq "pricePerKWH" ) {
+         my %message;
+        $message{'currencyId'} = "EUR";
+        $message{'vat'}        = "19";
+        $message{'costPerKWh'} = shift @param;
+        WriteToCloudAPI($hash, 'setChargingPrice', 'POST', \%message)
+    } 
+    else 
+    {
+        $hash->{LOCAL} = 1;
+        WriteToCloudAPI($hash, 'setStartCharging', 'POST')         if $opt eq "startCharging";
+        WriteToCloudAPI($hash, 'setStopCharging', 'POST')          if $opt eq 'stopCharging';  
+        WriteToCloudAPI($hash, 'setPauseCharging', 'POST')         if $opt eq 'pauseCharging';
+        WriteToCloudAPI($hash, 'setResumeCharging', 'POST')        if $opt eq 'resumeCharging';
+        WriteToCloudAPI($hash, 'setToggleCharging', 'POST')        if $opt eq 'toggleCharging';      
+        WriteToCloudAPI($hash, 'setUpdateFirmware', 'POST')        if $opt eq 'updateFirmware';
+        WriteToCloudAPI($hash, 'setOverrideChargingSchedule', 'POST')        if $opt eq 'overrideChargingSchedule';
+        WriteToCloudAPI($hash, 'setPairRFIDTag', 'POST')           if $opt eq 'pairRfidTag';     
+        WriteToCloudAPI($hash, 'setReboot', 'POST')                                   if $opt eq 'reboot';
+        WriteToCloudAPI($hash, 'tobedone', 'POST')                                    if $opt eq 'enableSmartCharging';
+        _loadToken($hash)                                                            if $opt eq 'refreshToken';   
+        delete $hash->{LOCAL};
+    }
+    readingsSingleUpdate( $hash, 'state', 'Initialized', 0 );
+    return undef;
 }
 
 sub Attr {
@@ -390,17 +439,33 @@ sub RefreshData{
     WriteToCloudAPI($hash, 'getCurrentSession', 'GET');
 }
 
+sub UpdateDueToTimer($) {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+
+    #local allows call of function without adding new timer.
+    #must be set before call ($hash->{LOCAL} = 1) and removed after (delete $hash->{LOCAL};)
+    if ( !$hash->{LOCAL} ) {
+        RemoveInternalTimer($hash);
+        #Log3 "Test", 1, Dumper($hash);
+        InternalTimer(
+            gettimeofday() + InternalVal( $name, 'INTERVAL', undef ), "UpdateDueToTimer", $hash );
+    }
+    RefreshData($hash);
+}
 
 sub WriteToCloudAPI {
     my $hash   = shift;
     my $dpoint = shift;
     my $method = shift;    
+    my $message = shift;
     my $name = $hash->{NAME};
     my $url = $hash->{APIURI} . $dpoints{$dpoint};
 
     #########
     # CHANGE THIS
-    my $payload = '';
+    my $payload;
+    $payload  = encode_json \%$message if defined $message;
     my $deviceId = "WC1";
 
    if ( not defined $hash ) {
@@ -571,7 +636,7 @@ sub ResponseHandling {
                 #);
                 #readingsBulkUpdate( $hash, "chargingSchedule",
                 #    $d->{chargingSchedule} );
-                readingsBulkUpdate( $hash, "lastResponse", 'OK - getReaderConfig', 1);
+                readingsBulkUpdate( $hash, "lastResponse", 'OK - getChargerConfig', 1);
                 readingsEndUpdate( $hash, 1 );
                 return undef;
             }
