@@ -9,7 +9,11 @@ use HttpUtils;
 use JSON;
 
 my %EaseeWallbox_gets = (
-    update   => "noArg",
+    update   => {
+                  args => "noArg",
+                  urlTemplate => "",
+                  callback => \&EaseeWallbox_httpSimpleOperationCallback
+              },
     health   => "noArg",
     baseData => "noArg",
     chargers => "noArg",
@@ -148,7 +152,7 @@ sub EaseeWallbox_getCmdList ($$$) {
             if ( defined($myOpt) and ( length($myOpt) > 0 ) );
         $myOpt = "" if ( !defined($myOpt) );
 
-        Log3 ($name, 5, "parse cmd-table - Set:$mySet, Option:$myOpt, RetVal:$retVal");
+        #Log3 ($name, 5, "parse cmd-table - Set:$mySet, Option:$myOpt, RetVal:$retVal");
     }
     if ( !defined($retVal) ) {
         $retVal = "error while parsing set-table";
@@ -533,8 +537,58 @@ sub EaseeWallbox_TokenRefresh {
     return;
 }
 
-sub EaseeWallbox_httpSimpleOperationOAuth($$$;$) {
-    my ( $hash, $url, $operation, $message ) = @_;
+sub EaseeWallbox_httpSimpleOperationCallback {
+    my ( $param, $err, $data ) = @_;
+    my $hash = $param->{hash};
+    my $name = $hash->{NAME};
+
+    Log3 $name, 4, "Callback received." . $param->{url};
+
+    if ( $err ne "" )   # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
+    {
+        Log3 $name, 3,"error while requesting ". $param->{url}. " - $err";    # Eintrag fürs Log
+        readingsSingleUpdate( $hash, "lastResponse", "ERROR $err", 1 );
+        return undef;
+    }
+
+    my $code = $param->{code};
+    if ($code >= 400){
+        Log3 $name, 3,"HTTPS error while requesting ". $param->{url}. " - $code";    # Eintrag fürs Log
+        readingsSingleUpdate( $hash, "lastResponse", "ERROR: HTTP Code $code", 1 );
+        return undef;
+    }
+
+    Log3 $name, 3,
+        "Received non-blocking data from EaseeWallbox regarding current session ";
+
+    Log3 $name, 4, "FHEM -> EaseeWallbox: " . $param->{url};
+    Log3 $name, 4, "FHEM -> EaseeWallbox: " . $param->{message}
+        if ( defined $param->{message} );
+    Log3 $name, 4, "EaseeWallbox -> FHEM: " . $data;
+    Log3 $name, 5, '$err: ' . $err;
+    Log3 $name, 5, "method: " . $param->{method};
+    Log3 $name, 2, "Something gone wrong"
+        if ( $data =~ "/EaseeWallboxMode/" );
+    eval {
+        my $d = decode_json($data) if ( !$err );
+        Log3 $name, 5, 'Decoded: ' . Dumper($d);
+        if ( defined $d and  not $d eq '') {
+            readingsSingleUpdate( $hash, "lastResponse", 'OK - Action '. $d->{commandId}, 1 )       if defined $d->{commandId};
+            readingsSingleUpdate( $hash, "lastResponse", 'ERROR: '. $d->{title}.' ('.$d->{status}.')', 1 )     if defined $d->{status} and defined $d->{title};
+            return undef;
+        }  else {
+            readingsSingleUpdate( $hash, "lastResponse", 'OK', 1);
+            return undef;
+        }
+    };
+    if ($@) {
+        readingsSingleUpdate( $hash, "lastResponse", 'ERROR while deconding response: '. $@, 1 );
+        Log3 $name, 5, 'Failure decoding: ' . $@;
+    } 
+}
+
+sub EaseeWallbox_httpSimpleOperationOAuth {
+    my ( $hash, $url, $operation, $message, $callback ) = @_;
     my ( $json, $err, $data, $decoded );
     my $name             = $hash->{NAME};
     my $CurrentTokenData = EaseeWallbox_LoadToken($hash);
@@ -549,42 +603,21 @@ sub EaseeWallbox_httpSimpleOperationOAuth($$$;$) {
             "Authorization" =>
                 "$CurrentTokenData->{'tokenType'} $CurrentTokenData->{'accessToken'}"
         },
+        callback => \&EaseeWallbox_httpSimpleOperationCallback,
         method  => $operation,
         timeout => 6,
-        hideurl => 1
+        hideurl => 1,
     };
 
+    $request->{callback} = $callback    if defined $callback;
     $request->{data} = $message if ( defined $message );
+
     Log3 $name, 5, 'Request: ' . Dumper($request);
+    $request->{hash} = $hash;
 
-    ( $err, $data ) = HttpUtils_BlockingGet($request);
-
-    $json = "" if ( !$json );
-    $data = "" if ( !$data );
-    Log3 $name, 4, "FHEM -> EaseeWallbox: " . $url;
-    Log3 $name, 4, "FHEM -> EaseeWallbox: " . $message
-        if ( defined $message );
-    Log3 $name, 4, "EaseeWallbox -> FHEM: " . $data if ( defined $data );
-    Log3 $name, 4, "EaseeWallbox -> FHEM: Got empty response."
-        if ( not defined $data );
-    Log3 $name, 5, '$err: ' . $err;
-    Log3 $name, 5, "method: " . $operation;
-    Log3 $name, 2, "Something gone wrong"
-        if ( $data =~ "/EaseeWallboxMode/" );
-
-    $err = 1 if ( $data =~ "/EaseeWallboxMode/" );
-    if ( defined $data and ( not $data eq '' ) and $operation ne 'DELETE' ) {
-        eval {
-            $decoded = decode_json($data) if ( !$err );
-            Log3 $name, 5, 'Decoded: ' . Dumper($decoded);
-            return $decoded;
-        } or do {
-            Log3 $name, 5, 'Failure decoding: ' . $@;
-        }
-    }
-    else {
-        return undef;
-    }
+    HttpUtils_NonblockingGet($request);
+     Log3 $name, 3,
+        "Async call executed. Waiting for callback...";
 }
 
 sub EaseeWallbox_ExecuteParameterlessCommand($$) {
@@ -649,6 +682,98 @@ sub EaseeWallbox_Attr(@) {
     return undef;
 }
 
+sub EaseeWallbox_GetChargersCallback(){
+
+    my ( $param, $err, $data ) = @_;
+    my $hash = $param->{hash};
+    my $name = $hash->{NAME};
+    my $d;
+
+    Log3 $name, 4, "Callback received." . $param->{url};
+
+    if ( $err ne "" )   # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
+    {
+        Log3 $name, 3,"error while requesting ". $param->{url}. " - $err";    # Eintrag fürs Log
+        readingsSingleUpdate( $hash, "lastResponse", "ERROR $err", 1 );
+        return undef;
+    }
+
+    my $code = $param->{code};
+    if ($code >= 400){
+        Log3 $name, 3,"HTTPS error while requesting ". $param->{url}. " - $code";    # Eintrag fürs Log
+        readingsSingleUpdate( $hash, "lastResponse", "ERROR: HTTP Code $code", 1 );
+        return undef;
+    }
+
+    Log3 $name, 3,
+        "Received non-blocking data from EaseeWallbox regarding current session ";
+
+    Log3 $name, 4, "FHEM -> EaseeWallbox: " . $param->{url};
+    Log3 $name, 4, "FHEM -> EaseeWallbox: " . $param->{message}
+        if ( defined $param->{message} );
+    Log3 $name, 4, "EaseeWallbox -> FHEM: " . $data;
+    Log3 $name, 5, '$err: ' . $err;
+    Log3 $name, 5, "method: " . $param->{method};
+    Log3 $name, 2, "Something gone wrong"
+        if ( $data =~ "/EaseeWallboxMode/" );
+    eval {
+        $d = decode_json($data) if ( !$err );
+        Log3 $name, 5, 'Decoded: ' . Dumper($d);
+    };
+    if ($@) {
+        readingsSingleUpdate( $hash, "lastResponse", 'ERROR while deconding response: '. $@, 1 );
+        Log3 $name, 5, 'Failure decoding: ' . $@;
+        return undef;
+    } 
+
+     if ( defined $d && ref($d) eq "HASH" && defined $d->{errors} ) {
+            log 1, Dumper $d;
+            readingsSingleUpdate( $hash,
+                "Error: $d->{errors}[0]->{code} / $d->{errors}[0]->{title}",
+                'Undefined', 1 );
+            return undef;
+
+        }
+        else {
+
+            readingsBeginUpdate($hash);
+
+            my $site    = $d->[0];
+            my $circuit = $site->{circuits}->[0];
+            my $charger = $circuit->{chargers}->[0];
+
+            readingsBeginUpdate($hash);
+            my $chargerId = $charger->{id};
+            readingsBulkUpdate( $hash, "charger_id",   $chargerId );
+            readingsBulkUpdate( $hash, "charger_name", $charger->{name} );
+            #readingsBulkUpdate( $hash, "charger_isTemporary", $charger->{isTemporary} );
+            #readingsBulkUpdate( $hash, "charger_createdOn", $charger->{createdOn} );
+            readingsEndUpdate( $hash, 1 );
+
+ #           $readTemplate = $EaseeWallbox_urls{"getChargerDetails"};
+ #           $readTemplate =~ s/#ChargerID#/$chargerId/g;
+ #           $d = EaseeWallbox_httpSimpleOperationOAuth( $hash, $readTemplate,
+ #               'GET' );
+
+ #           if ( defined $d && ref($d) eq "HASH" && defined $d->{errors} ) {
+ #               log 1, Dumper $d;
+ #               readingsSingleUpdate( $hash,
+ #                   "Error: $d->{errors}[0]->{code} / $d->{errors}[0]->{title}",
+ #                   'Undefined', 1 );
+ #               return undef;
+ #           }
+ #           else {
+ #               readingsBeginUpdate($hash);
+ #               readingsBulkUpdate( $hash, "product",  $d->{product} );
+ #               readingsBulkUpdate( $hash, "pincode",  $d->{pinCode} );
+ #               readingsBulkUpdate( $hash, "unitType", $d->{unitType} );
+ #               readingsEndUpdate( $hash, 1 );
+ #           }
+            readingsSingleUpdate( $hash, "lastResponse", 'OK', 1);
+            return undef;
+        }
+}
+
 sub EaseeWallbox_GetChargers($) {
 
     my ($hash) = @_;
@@ -662,55 +787,10 @@ sub EaseeWallbox_GetChargers($) {
 
     my $readTemplate = $EaseeWallbox_urls{"getChargers"};
 
-    my $d = EaseeWallbox_httpSimpleOperationOAuth( $hash, $readTemplate,
-        'GET' );
+    EaseeWallbox_httpSimpleOperationOAuth( $hash, $readTemplate, 'GET', '', \&EaseeWallbox_GetChargersCallback );
+    return undef;
 
-    if ( defined $d && ref($d) eq "HASH" && defined $d->{errors} ) {
-        log 1, Dumper $d;
-        readingsSingleUpdate( $hash,
-            "Error: $d->{errors}[0]->{code} / $d->{errors}[0]->{title}",
-            'Undefined', 1 );
-        return undef;
-
-    }
-    else {
-
-        readingsBeginUpdate($hash);
-
-        my $site    = $d->[0];
-        my $circuit = $site->{circuits}->[0];
-        my $charger = $circuit->{chargers}->[0];
-
-        readingsBeginUpdate($hash);
-        my $chargerId = $charger->{id};
-        readingsBulkUpdate( $hash, "charger_id",   $chargerId );
-        readingsBulkUpdate( $hash, "charger_name", $charger->{name} );
-        #readingsBulkUpdate( $hash, "charger_isTemporary", $charger->{isTemporary} );
-        #readingsBulkUpdate( $hash, "charger_createdOn", $charger->{createdOn} );
-        readingsEndUpdate( $hash, 1 );
-
-        $readTemplate = $EaseeWallbox_urls{"getChargerDetails"};
-        $readTemplate =~ s/#ChargerID#/$chargerId/g;
-        $d = EaseeWallbox_httpSimpleOperationOAuth( $hash, $readTemplate,
-            'GET' );
-
-        if ( defined $d && ref($d) eq "HASH" && defined $d->{errors} ) {
-            log 1, Dumper $d;
-            readingsSingleUpdate( $hash,
-                "Error: $d->{errors}[0]->{code} / $d->{errors}[0]->{title}",
-                'Undefined', 1 );
-            return undef;
-        }
-        else {
-            readingsBeginUpdate($hash);
-            readingsBulkUpdate( $hash, "product",  $d->{product} );
-            readingsBulkUpdate( $hash, "pincode",  $d->{pinCode} );
-            readingsBulkUpdate( $hash, "unitType", $d->{unitType} );
-            readingsEndUpdate( $hash, 1 );
-        }
-
-        return undef;
-    }
+   
 }
 
 sub EaseeWallbox_GetChargerConfig($) {
