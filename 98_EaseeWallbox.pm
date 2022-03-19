@@ -444,6 +444,11 @@ sub Set {
         $message{'timeout'} = "60";
         WriteToCloudAPI($hash, 'setPairRFIDTag', 'POST', \%message)
     } 
+    elsif ( $opt eq "enableSmartCharging" ) {
+         my %message;
+        $message{'smartCharging'} = shift @param;
+        WriteToCloudAPI($hash, 'changeChargerSettings', 'POST', \%message)
+    } 
     else 
     {
         $hash->{LOCAL} = 1;
@@ -455,7 +460,6 @@ sub Set {
         WriteToCloudAPI($hash, 'setUpdateFirmware', 'POST')        if $opt eq 'updateFirmware';
         WriteToCloudAPI($hash, 'setOverrideChargingSchedule', 'POST')        if $opt eq 'overrideChargingSchedule';    
         WriteToCloudAPI($hash, 'setReboot', 'POST')                                   if $opt eq 'reboot';
-        WriteToCloudAPI($hash, 'tobedone', 'POST')                                    if $opt eq 'enableSmartCharging';
         _loadToken($hash)                                                            if $opt eq 'refreshToken';   
         delete $hash->{LOCAL};
     }
@@ -600,7 +604,7 @@ sub ResponseHandling {
     eval {
         my $d = decode_json($data);
         Log3 $name, 5, 'Decoded: ' . Dumper($d);
-        if ( defined $d and $d ne '') {
+        if ( defined $d and $d ne '' and ref($d) eq "HASH") {
 
             if($param->{dpoint} eq 'getChargers')
             {
@@ -736,7 +740,6 @@ sub ResponseHandling {
                 readingsEndUpdate( $hash, 1 );
                 return undef;            
             }
-
             readingsSingleUpdate( $hash, "lastResponse", 'OK - Action: '. $commandCodes{$d->{commandId}}, 1 )       if defined $d->{commandId};
             readingsSingleUpdate( $hash, "lastResponse", 'ERROR: '. $d->{title}.' ('.$d->{status}.')', 1 )     if defined $d->{status} and defined $d->{title};
             return undef;
