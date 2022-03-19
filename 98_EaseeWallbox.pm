@@ -83,6 +83,7 @@ BEGIN {
           readingsEndUpdate
           readingsBulkUpdate
           readingsSingleUpdate
+          readingsDelete
           InternalVal
           ReadingsVal
           RemoveInternalTimer
@@ -502,6 +503,8 @@ sub RefreshData{
     WriteToCloudAPI($hash, 'getChargerSite', 'GET');
     WriteToCloudAPI($hash, 'getChargerState', 'GET');
     WriteToCloudAPI($hash, 'getCurrentSession', 'GET');
+    WriteToCloudAPI($hash, 'getChargerSessionsMonthly', 'GET');
+    WriteToCloudAPI($hash, 'getChargerSessionsDaily', 'GET');        
 }
 
 sub UpdateDueToTimer($) {
@@ -606,6 +609,19 @@ sub ResponseHandling {
     }
 
     my $code = $param->{code};
+    if ($code eq 404 and $param->{dpoint} eq 'getCurrentSession'){
+        readingsDelete($hash, 'session_energy' );
+        readingsDelete($hash, 'session_start' );
+        readingsDelete($hash, 'session_end' );
+        readingsDelete($hash, 'session_chargeDurationInSeconds' );
+        readingsDelete($hash, 'session_firstEnergyTransfer' );
+        readingsDelete($hash, 'session_lastEnergyTransfer' );
+        readingsDelete($hash, 'session_pricePerKWH' );
+        readingsDelete($hash, 'session_chargingCost' );
+        readingsDelete($hash, 'session_id' );
+        return undef;
+    }
+
     if ($code >= 400){
         Log3 $name, 3,"HTTPS error while requesting ". $param->{url}. " - $code";    # Eintrag fürs Log
         readingsSingleUpdate( $hash, "lastResponse", "ERROR: HTTP Code $code", 1 );
@@ -629,12 +645,11 @@ sub ResponseHandling {
         my $d = decode_json($data);
         Log3 $name, 5, 'Decoded: ' . Dumper($d);
         Log3 $name, 5, 'Ref of d: ' . ref($d);        
-        $d = $d->[0]   if ref($d) eq "ARRAY";
-        if ( defined $d and $d ne '' and ref($d) eq "HASH") {
 
+        if ( defined $d and $d ne '' and ref($d) eq "HASH" or (ref($d) eq "ARRAY" and $d gt 0)) {
             if($param->{dpoint} eq 'getChargers')
             {
-                my $site    = $d;
+                my $site    =  $d->[0];
                 my $circuit = $site->{circuits}->[0];
                 my $charger = $circuit->{chargers}->[0];
 
@@ -649,6 +664,37 @@ sub ResponseHandling {
                 WriteToCloudAPI($hash, 'getChargerConfiguration', 'GET');
                 return;
             }
+
+            if($param->{dpoint} eq 'getChargerSessionsDaily')
+            {
+                Log3 $name, 5, 'Evaluating getChargerSessionsDaily';
+                my @x   =  $d;
+                my @a = (-5..-1);
+                readingsBeginUpdate($hash);
+                for(@a){
+                    Log3 $name, 5, 'laeuft noch: '. $_;
+                    readingsBulkUpdate( $hash, "daily_".($_ +1)."_energy",   sprintf("%.2f",$d->[$_]->{'totalEnergyUsage'}) ); 
+                    readingsBulkUpdate( $hash, "daily_".($_ +1)."_cost",   sprintf("%.2f",$d->[$_]->{'totalCost'}) ); 
+                }
+                readingsEndUpdate( $hash, 1 );
+                return;
+            }
+
+            if($param->{dpoint} eq 'getChargerSessionsMonthly')
+            {
+                Log3 $name, 5, 'Evaluating getChargerSessionsMonthly';
+                my @x   =  $d;
+                my @a = (-6..-1);
+                readingsBeginUpdate($hash);
+                for(@a){
+                    Log3 $name, 5, 'laeuft noch: '. $_;
+                    readingsBulkUpdate( $hash, "monthly_".($_ +1)."_energy",   sprintf("%.2f",$d->[$_]->{'totalEnergyUsage'}) ); 
+                    readingsBulkUpdate( $hash, "monthly_".($_ +1)."_cost",   sprintf("%.2f",$d->[$_]->{'totalCost'}) ); 
+                }
+                readingsEndUpdate( $hash, 1 );
+                return;
+            }
+
 
             if($param->{dpoint} eq 'getChargerConfiguration')
             {
@@ -766,6 +812,8 @@ sub ResponseHandling {
                 readingsEndUpdate( $hash, 1 );
                 return undef;            
             }
+
+            $d = $d->[0]   if ref($d) eq "ARRAY";
             readingsSingleUpdate( $hash, "lastResponse", 'OK - Action: '. $commandCodes{$d->{commandId}}, 1 )       if defined $d->{commandId};
             readingsSingleUpdate( $hash, "lastResponse", 'ERROR: '. $d->{title}.' ('.$d->{status}.')', 1 )     if defined $d->{status} and defined $d->{title};
             return undef;
@@ -774,6 +822,7 @@ sub ResponseHandling {
             return undef;
         }
     };
+
     if ($@) {
         readingsSingleUpdate( $hash, "lastResponse", 'ERROR while deconding response: '. $@, 1 );
         Log3 $name, 5, 'Failure decoding: ' . $@;
