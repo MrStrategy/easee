@@ -326,7 +326,7 @@ sub Define {
     WriteToCloudAPI($hash, 'getChargers', 'GET');
 
     Log3 $name, 1, sprintf("EaseeWallbox_Define %s: Starting timer with interval %s", $name, InternalVal($name,'INTERVAL', undef));
-    InternalTimer(gettimeofday()+ InternalVal($name,'INTERVAL', undef), "UpdateDueToTimer", $hash) if (defined $hash);
+    InternalTimer(gettimeofday()+ InternalVal($name,'INTERVAL', undef), "FHEM::EaseeWallbox::UpdateDueToTimer", $hash) if (defined $hash);
     return undef;
 }
 
@@ -381,7 +381,7 @@ sub Set {
         $hash->{LOCAL} = 1;
         RefreshData($hash);
         delete $hash->{LOCAL};      
-        InternalTimer(gettimeofday()+ InternalVal($name,'INTERVAL', undef), "UpdateDueToTimer", $hash);
+        InternalTimer(gettimeofday()+ InternalVal($name,'INTERVAL', undef), "FHEM::EaseeWallbox::UpdateDueToTimer", $hash);
         readingsSingleUpdate($hash,'state','Started',0);  
         Log3 $name, 1, sprintf("EaseeWallbox_Set %s: Updated readings and started timer to automatically update readings with interval %s", $name, InternalVal($name,'INTERVAL', undef));
     }
@@ -449,7 +449,7 @@ sub UpdateDueToTimer($) {
         RemoveInternalTimer($hash);
         #Log3 "Test", 1, Dumper($hash);
         InternalTimer(
-            gettimeofday() + InternalVal( $name, 'INTERVAL', undef ), "UpdateDueToTimer", $hash );
+            gettimeofday() + InternalVal( $name, 'INTERVAL', undef ), "FHEM::EaseeWallbox::UpdateDueToTimer", $hash );
     }
     RefreshData($hash);
 }
@@ -653,6 +653,7 @@ sub ResponseHandling {
                 readingsBulkUpdate( $hash, "session_pricePerKWH", $d->{pricePrKwhIncludingVat} );
                 readingsBulkUpdate( $hash, "session_chargingCost", $d->{costIncludingVat} );
                 readingsBulkUpdate( $hash, "session_id", $d->{sessionId} );
+                readingsBulkUpdate( $hash, "lastResponse", 'OK - getCurrentSession', 1);
                 readingsEndUpdate( $hash, 1 );
                 return undef;
             }
@@ -668,6 +669,7 @@ sub ResponseHandling {
                 #readingsBulkUpdate( $hash, "site_ratedCurrent", $d->{ratedCurrent} );
                 #readingsBulkUpdate( $hash, "site_createdOn",    $d->{createdOn} );
                 #readingsBulkUpdate( $hash, "site_updatedOn",    $d->{updatedOn} );
+                readingsBulkUpdate( $hash, "lastResponse", 'OK - getChargerSite', 1);
                 readingsEndUpdate( $hash, 1 );
                 return undef;            
             }
@@ -693,6 +695,7 @@ sub ResponseHandling {
                 readingsBulkUpdate( $hash, "wifi_rssi",      $d->{wiFiRSSI} );
                 readingsBulkUpdate( $hash, "wifi_apEnabled", $d->{wiFiAPEnabled} );
                 readingsBulkUpdate( $hash, "cell_rssi",      $d->{cellRSSI} );
+                readingsBulkUpdate( $hash, "lastResponse", 'OK - getChargerState', 1);
                 readingsEndUpdate( $hash, 1 );
                 return undef;            
             }
