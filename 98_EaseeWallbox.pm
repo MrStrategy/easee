@@ -111,6 +111,10 @@ my %gets = (
 );
 
 my %sets = (
+    enabled                  => "",
+    disabled                 => "",    
+    enableSmartButton        => "true,false",
+    authorizationRequired    => "true,false",    
     startCharging            => "",
     stopCharging             => "",
     pauseCharging            => "",
@@ -449,9 +453,29 @@ sub Set {
         $message{'smartCharging'} = shift @param;
         WriteToCloudAPI($hash, 'changeChargerSettings', 'POST', \%message)
     } 
+    elsif ( $opt eq "enabled" ) {
+         my %message;
+        $message{'enabled'} = "true";
+        WriteToCloudAPI($hash, 'changeChargerSettings', 'POST', \%message)
+    } 
+    elsif ( $opt eq "disabled" ) {
+         my %message;
+        $message{'enabled'} = "false";
+        WriteToCloudAPI($hash, 'changeChargerSettings', 'POST', \%message)
+    } 
+    elsif ( $opt eq "authorizationRequired" ) {
+         my %message;
+        $message{'authorizationRequired'} = shift @param;
+        WriteToCloudAPI($hash, 'changeChargerSettings', 'POST', \%message)
+    } 
+    elsif ( $opt eq "enableSmartButton" ) {
+         my %message;
+        $message{'smartButtonEnabled'} = shift @param;
+        WriteToCloudAPI($hash, 'changeChargerSettings', 'POST', \%message)
+    } 
     else 
     {
-        $hash->{LOCAL} = 1;
+        $hash->{LOCAL} = 1;     
         WriteToCloudAPI($hash, 'setStartCharging', 'POST')         if $opt eq "startCharging";
         WriteToCloudAPI($hash, 'setStopCharging', 'POST')          if $opt eq 'stopCharging';  
         WriteToCloudAPI($hash, 'setPauseCharging', 'POST')         if $opt eq 'pauseCharging';
@@ -604,18 +628,20 @@ sub ResponseHandling {
     eval {
         my $d = decode_json($data);
         Log3 $name, 5, 'Decoded: ' . Dumper($d);
+        Log3 $name, 5, 'Ref of d: ' . ref($d);        
+        $d = $d->[0]   if ref($d) eq "ARRAY";
         if ( defined $d and $d ne '' and ref($d) eq "HASH") {
 
             if($param->{dpoint} eq 'getChargers')
             {
-                my $site    = $d->[0];
+                my $site    = $d;
                 my $circuit = $site->{circuits}->[0];
                 my $charger = $circuit->{chargers}->[0];
 
                 readingsBeginUpdate($hash);
                 my $chargerId = $charger->{id};
                 readingsBulkUpdate( $hash, "site_id",   $site->{id} ); 
-                readingsBulkUpdate( $hash, "site_key",    $d->{siteKey} );               
+                readingsBulkUpdate( $hash, "site_key",    $site->{siteKey} );               
                 readingsBulkUpdate( $hash, "charger_id",   $chargerId );
                 readingsBulkUpdate( $hash, "charger_name", $charger->{name} );
                 readingsBulkUpdate( $hash, "lastResponse", 'OK - getReaders', 1);
