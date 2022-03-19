@@ -8,6 +8,8 @@ use utf8;
 use Encode qw( encode_utf8 );
 use HttpUtils;
 use JSON;
+use DateTime;
+use DateTime::Format::Strptime;
 
 # try to use JSON::MaybeXS wrapper
 #   for chance of better performance + open code
@@ -573,7 +575,8 @@ sub ResponseHandling {
 
                 readingsBeginUpdate($hash);
                 my $chargerId = $charger->{id};
-                readingsBulkUpdate( $hash, "site_id",   $site->{id} );                
+                readingsBulkUpdate( $hash, "site_id",   $site->{id} ); 
+                readingsBulkUpdate( $hash, "site_key",    $d->{siteKey} );               
                 readingsBulkUpdate( $hash, "charger_id",   $chargerId );
                 readingsBulkUpdate( $hash, "charger_name", $charger->{name} );
                 readingsBulkUpdate( $hash, "lastResponse", 'OK - getReaders', 1);
@@ -644,14 +647,14 @@ sub ResponseHandling {
             if($param->{dpoint} eq 'getCurrentSession')
             {
                 readingsBeginUpdate($hash);
-                readingsBulkUpdate( $hash, "session_energy", $d->{sessionEnergy} );
-                readingsBulkUpdate( $hash, "session_start",  $d->{sessionStart} );
-                readingsBulkUpdate( $hash, "session_end",    $d->{sessionEnd} );
+                readingsBulkUpdate( $hash, "session_energy", sprintf("%.2f",$d->{sessionEnergy}) );
+                readingsBulkUpdate( $hash, "session_start",  _transcodeDate($d->{sessionStart}) );
+                readingsBulkUpdate( $hash, "session_end",    _transcodeDate($d->{sessionEnd}) );
                 readingsBulkUpdate( $hash, "session_chargeDurationInSeconds", $d->{chargeDurationInSeconds} );
-                readingsBulkUpdate( $hash, "session_firstEnergyTransfer",$d->{firstEnergyTransferPeriodStart} );
+                readingsBulkUpdate( $hash, "session_firstEnergyTransfer", _transcodeDate($d->{firstEnergyTransferPeriodStart}) );
                 readingsBulkUpdate( $hash, "session_lastEnergyTransfer", $d->{lastEnergyTransferPeriodStart} );
                 readingsBulkUpdate( $hash, "session_pricePerKWH", $d->{pricePrKwhIncludingVat} );
-                readingsBulkUpdate( $hash, "session_chargingCost", $d->{costIncludingVat} );
+                readingsBulkUpdate( $hash, "session_chargingCost", sprintf("%.2f",$d->{costIncludingVat}) );
                 readingsBulkUpdate( $hash, "session_id", $d->{sessionId} );
                 readingsBulkUpdate( $hash, "lastResponse", 'OK - getCurrentSession', 1);
                 readingsEndUpdate( $hash, 1 );
@@ -661,7 +664,6 @@ sub ResponseHandling {
             if($param->{dpoint} eq 'getChargerSite')
             {
                 readingsBeginUpdate($hash);
-                readingsBulkUpdate( $hash, "site_key",    $d->{siteKey} );
                 readingsBulkUpdate( $hash, "cost_perKWh", $d->{costPerKWh} );
                 readingsBulkUpdate( $hash, "cost_perKwhExcludeVat", $d->{costPerKwhExcludeVat} );
                 readingsBulkUpdate( $hash, "cost_vat",          $d->{vat} );
@@ -680,18 +682,18 @@ sub ResponseHandling {
                 readingsBulkUpdate( $hash, "operationModeCode", $d->{chargerOpMode} );
                 readingsBulkUpdate( $hash, "operationMode", $operationModes{ $d->{chargerOpMode} } );
                 readingsBulkUpdate( $hash, "power", $d->{totalPower} );
-                readingsBulkUpdate( $hash, "kWhInSession", $d->{sessionEnergy} );
+                readingsBulkUpdate( $hash, "kWhInSession", sprintf("%.2f",$d->{sessionEnergy}) );
                 readingsBulkUpdate( $hash, "phase",       $d->{outputPhase} );
-                readingsBulkUpdate( $hash, "latestPulse", $d->{latestPulse} );
+                readingsBulkUpdate( $hash, "latestPulse", _transcodeDate($d->{latestPulse}) );
                 readingsBulkUpdate( $hash, "current", $d->{outputCurrent} );
                 readingsBulkUpdate( $hash, "dynamicCurrent", $d->{dynamicChargerCurrent} );
                 readingsBulkUpdate( $hash, "reasonCodeForNoCurrent", $d->{reasonForNoCurrent} );
                 readingsBulkUpdate( $hash, "reasonForNoCurrent", $reasonsForNoCurrent{ $d->{reasonForNoCurrent} } );
                 readingsBulkUpdate( $hash, "errorCode",      $d->{errorCode} );
                 readingsBulkUpdate( $hash, "fatalErrorCode", $d->{fatalErrorCode} );
-                readingsBulkUpdate( $hash, "lifetimeEnergy", $d->{lifetimeEnergy} );
+                readingsBulkUpdate( $hash, "lifetimeEnergy", sprintf("%.2f",$d->{lifetimeEnergy}) );
                 readingsBulkUpdate( $hash, "online",         $d->{isOnline} );
-                readingsBulkUpdate( $hash, "voltage",        $d->{voltage} );
+                readingsBulkUpdate( $hash, "voltage",        sprintf("%.2f",$d->{voltage}) );
                 readingsBulkUpdate( $hash, "wifi_rssi",      $d->{wiFiRSSI} );
                 readingsBulkUpdate( $hash, "wifi_apEnabled", $d->{wiFiAPEnabled} );
                 readingsBulkUpdate( $hash, "cell_rssi",      $d->{cellRSSI} );
@@ -926,7 +928,14 @@ sub _decrypt($) {
 
 1;
 
-
+sub _transcodeDate{
+    my $datestr  = shift;    
+    my $strp = DateTime::Format::Strptime->new(on_error=>'croak',
+        pattern => '%Y-%m-%dT%H:%M:%S%z');
+    my $dt = $strp->parse_datetime($datestr);
+    $dt->set_time_zone('Europe/Berlin');
+    return $dt->strftime('%Y-%m-%d %H:%M:%S');
+}
 
 
 
