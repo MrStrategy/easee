@@ -185,6 +185,7 @@ my %phaseModes = (
     3 => 'Locked to three phase',
 );
 my %operationModes = (
+    0 => "Disconnected",
     1 => "Standby",
     2 => "Paused",
     3 => 'Charging',
@@ -192,6 +193,33 @@ my %operationModes = (
     5 => 'Error',
     6 => 'CarConnected'
 );
+
+my %commandCodes = (
+  1 => "Reboot",
+  2 => "Poll single observation",
+  3 => "Poll all observations",
+  4 => "Upgrade Firmware",
+  5 => "Download settings",
+  7 => "Scan Wifi",
+  11 => "Set smart charging",
+  23 => "Abort charging",
+  25 => "Start Charging",
+  26 => "Stop Charging",
+  29 => "Set enabled",
+  30 => "Set cable lock",
+  11 => "Set smart charging",
+  40 => "Set lightstripe brightness",
+  43 => "Add keys",
+  44 => "Clear keys",
+  48 => "Pause/Resume/Toggle Charging",
+  60 => "Add schedule",
+  61 => "Cear Schedule",
+  62 => "Get Schedule",
+  63 => "Override Schedule",
+  64 => "Purge Schedule",
+  69 => "Set RFID Pairing Mode",  
+);
+
 
 #Private function to evaluate command-lists
 # private funktionen beginnen immer mit _
@@ -408,6 +436,14 @@ sub Set {
         $message{'costPerKWh'} = shift @param;
         WriteToCloudAPI($hash, 'setChargingPrice', 'POST', \%message)
     } 
+    elsif ( $opt eq "pairRfidTag" ) {
+        my $timeout = shift @param;
+        #if (defined $timeout and /^\d+$/)         { print "is a whole number\n" }
+        $timeout = '60'             if not defined $timeout or $timeout = '';
+         my %message;
+        $message{'timeout'} = "60";
+        WriteToCloudAPI($hash, 'setPairRFIDTag', 'POST', \%message)
+    } 
     else 
     {
         $hash->{LOCAL} = 1;
@@ -417,8 +453,7 @@ sub Set {
         WriteToCloudAPI($hash, 'setResumeCharging', 'POST')        if $opt eq 'resumeCharging';
         WriteToCloudAPI($hash, 'setToggleCharging', 'POST')        if $opt eq 'toggleCharging';      
         WriteToCloudAPI($hash, 'setUpdateFirmware', 'POST')        if $opt eq 'updateFirmware';
-        WriteToCloudAPI($hash, 'setOverrideChargingSchedule', 'POST')        if $opt eq 'overrideChargingSchedule';
-        WriteToCloudAPI($hash, 'setPairRFIDTag', 'POST')           if $opt eq 'pairRfidTag';     
+        WriteToCloudAPI($hash, 'setOverrideChargingSchedule', 'POST')        if $opt eq 'overrideChargingSchedule';    
         WriteToCloudAPI($hash, 'setReboot', 'POST')                                   if $opt eq 'reboot';
         WriteToCloudAPI($hash, 'tobedone', 'POST')                                    if $opt eq 'enableSmartCharging';
         _loadToken($hash)                                                            if $opt eq 'refreshToken';   
@@ -702,7 +737,7 @@ sub ResponseHandling {
                 return undef;            
             }
 
-            readingsSingleUpdate( $hash, "lastResponse", 'OK - Action '. $d->{commandId}, 1 )       if defined $d->{commandId};
+            readingsSingleUpdate( $hash, "lastResponse", 'OK - Action: '. $commandCodes{$d->{commandId}}, 1 )       if defined $d->{commandId};
             readingsSingleUpdate( $hash, "lastResponse", 'ERROR: '. $d->{title}.' ('.$d->{status}.')', 1 )     if defined $d->{status} and defined $d->{title};
             return undef;
         }  else {
