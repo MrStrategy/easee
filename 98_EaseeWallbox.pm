@@ -1062,13 +1062,73 @@ sub _transcodeDate{
     return $dt->strftime('%Y-%m-%d %H:%M:%S');
 }
 
-
+1;
 
 
 =pod
+=item device
+=item summary       Modul to communicate with EaseeCloud 
+=item summary_DE    Modul zur Kommunikation mit der EaseeCloud 
 =begin html
 
+<a name="EaseeWallbox"></a>
+<h3>EaseeWallbox</h3>
+<ul>
+    <i>EaseeWallbox</i> connects your FHEM instance with the Easee Cloud to interact with your Easee Wallbox.
+    All communication takes place via the Easee cloud API and the cloud interacts with the wallbox. There is no direct communication between the 
+    FHEM module and the wallbox. If the wallbox is offline non of the functions within this module will work.
+    The module allows to fecth the current status of the wallbox, get historical data and execute commands e.g. to start or stop the charging process.
+</ul>
+<br>
+<br>
+<a name="EaseeWallboxdefine"></a>
+<b>Define</b>
+<ul>
+    <code>define &lt;name&gt; EaseeWallbox &lt;username&gt; &lt;password&gt;</code>
+    <br>
+    <br> Example: <code>define myWallbox EaseeWallbox sample@login.com myFancyPassword</code>
+</ul>
+<br>
+ <a name="EaseeWallboxreadings"></a>
+  <br><br>
+  <b>Readings</b>
+  <ul>
+    <li><b>Basic Information</b></li>
+    <li>charger_id - the unique identifier of the charger</li>
+    <li>charger_name - the name of the charger</li>
+    <li>site_id - the unique identifier of the installation site of the charger</li>
+    <li>site_key - the key of the current installation site</li>
+   
+    <li><b>Reader Configuration</b></li>
+    <li>isEnabled - Indicates if the charger is enabled (1) or disabled (0)</li>
+    <li>isCablePermanentlyLocked - Indicates if the charging cable is permanently locked at the wallbox connection.</li>
+    <li>isAuthorizationRequired - Indicates if the use must authorize the charging process via RFID card or app before chargig starts.</li>
+    <li>isRemoteStartRequired - ???</li>
+    <li>isSmartButtonEnabled - Indicates if the smart button of the wallbox is enabled (e.g. allows to start a loading process directly at the box even if a schedule is active</li>
+    <li>isLocalAuthorizationRequired - Inidcates if authentication via RFID is required if the wallbox is not connected to the cloud.</li>
+    <li>wiFiSSID - The SSID of the WiFI beeing used.</li>
+    <li>phaseModeId - The numeric code of the current phase mode configuration</li>
+    <li>phaseMode - The currently configured phase mode. One of <i>Auto, Locked to single phase, Locked to three phase</i></li>
+    <li>maxChargerCurrent - The max current configured for this charger</li>
+    <li>ledStripBrightness - The brightness setting for the LED strip of the wallbox.</li>
 
+    <li><b>Site Configuration</b></li>
+    <li>cost_perKWh - the total cost per charged kWh.</li>
+    <li>cost_perKwhExcludeVat - the cost per charged kWh without value-added tax (vat).</li>
+    <li>cost_vat - the value-added tax (vat) applied to the netto price.</li>
+    <li>cost_currency - the currency used to calculate the cost.</li>
+
+    <li><b>Charger State</b></li>
+    <li>online - indicates if the wallbox is currently online.</li>
+    <li>power - the current output of the Easee Wallbox in kWh</li>
+    <li>current - the current output current of the Easee Wallbox in ampere</li>
+    <li>kWhInSession - the kWH charged in latest charging session.</li>
+    <li>latestPulse - date and time of the last point in time when power was send to the car.</li>
+    <li>reasonCodeForNoCurrent - a code describing why the wallbox is not charging</li>
+    <li>reasonForNoCurrent - a textual description why the wallbox is not charging</li>
+    <li>to be continued....</li>                                 
+  </ul>
+  <br><br>
 =end html
 
 =cut
