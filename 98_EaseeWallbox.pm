@@ -127,6 +127,7 @@ my %sets = (
     reboot                   => "noArg",
     updateFirmware           => "noArg",
     enableSmartCharging      => "true,false",
+    ledStripBrightness       => "",
     overrideChargingSchedule => "",
     pairRfidTag              => "",
     pricePerKWH              => "",
@@ -474,6 +475,11 @@ sub Set {
         $message{'smartButtonEnabled'} = shift @param;
         WriteToCloudAPI($hash, 'changeChargerSettings', 'POST', \%message)
     } 
+    elsif ( $opt eq "ledStripBrightness" ) {
+         my %message;
+        $message{'ledStripBrightness'} = shift @param;
+        WriteToCloudAPI($hash, 'changeChargerSettings', 'POST', \%message)
+    } 
     else 
     {
         $hash->{LOCAL} = 1;     
@@ -503,6 +509,7 @@ sub RefreshData{
     WriteToCloudAPI($hash, 'getChargerSite', 'GET');
     WriteToCloudAPI($hash, 'getChargerState', 'GET');
     WriteToCloudAPI($hash, 'getCurrentSession', 'GET');
+    WriteToCloudAPI($hash, 'getChargerConfiguration', 'GET');
     WriteToCloudAPI($hash, 'getChargerSessionsMonthly', 'GET');
     WriteToCloudAPI($hash, 'getChargerSessionsDaily', 'GET');        
 }
@@ -699,15 +706,15 @@ sub ResponseHandling {
             if($param->{dpoint} eq 'getChargerConfiguration')
             {
                 readingsBeginUpdate($hash);
-                readingsBulkUpdate( $hash, "charger_isEnabled", $d->{isEnabled} );
-                readingsBulkUpdate( $hash, "lockCablePermanently", $d->{lockCablePermanently} );
-                readingsBulkUpdate($hash, "authorizationRequired", $d->{authorizationRequired});
-                readingsBulkUpdate( $hash, "remoteStartRequired", $d->{remoteStartRequired} );
-                readingsBulkUpdate( $hash, "smartButtonEnabled", $d->{smartButtonEnabled} );
+                readingsBulkUpdate( $hash, "isEnabled", $d->{isEnabled} );
+                readingsBulkUpdate( $hash, "isCablePermanentlyLocked", $d->{lockCablePermanently} );
+                readingsBulkUpdate($hash, "isAuthorizationRequired", $d->{authorizationRequired});
+                readingsBulkUpdate( $hash, "isRemoteStartRequired", $d->{remoteStartRequired} );
+                readingsBulkUpdate( $hash, "isSmartButtonEnabled", $d->{smartButtonEnabled} );
                 readingsBulkUpdate( $hash, "wiFiSSID", $d->{wiFiSSID} );
-                readingsBulkUpdate( $hash, "charger_phaseModeId", $d->{phaseMode} );
-                readingsBulkUpdate( $hash, "charger_phaseMode",$phaseModes{ $d->{phaseMode} } );
-                readingsBulkUpdate($hash, "localAuthorizationRequired",$d->{localAuthorizationRequired});        
+                readingsBulkUpdate( $hash, "phaseModeId", $d->{phaseMode} );
+                readingsBulkUpdate( $hash, "phaseMode",$phaseModes{ $d->{phaseMode} } );
+                readingsBulkUpdate($hash, "isLocalAuthorizationRequired",$d->{localAuthorizationRequired});        
                 readingsBulkUpdate( $hash, "maxChargerCurrent", $d->{maxChargerCurrent} );
                 readingsBulkUpdate( $hash, "ledStripBrightness", $d->{ledStripBrightness} );
                 #readingsBulkUpdate( $hash, "charger_offlineChargingMode",
@@ -759,11 +766,15 @@ sub ResponseHandling {
             {
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate( $hash, "session_energy", sprintf("%.2f",$d->{sessionEnergy}) );
-                readingsBulkUpdate( $hash, "session_start",  _transcodeDate($d->{sessionStart}) );
-                readingsBulkUpdate( $hash, "session_end",    _transcodeDate($d->{sessionEnd}) );
+                my $value = defined $d->{sessionStart} ? _transcodeDate($d->{sessionStart}) : 'N/A';
+                readingsBulkUpdate( $hash, "session_start",  $value );                                  
+                my $value = defined $d->{sessionEnd} ? _transcodeDate($d->{sessionEnd}) : 'N/A';
+                readingsBulkUpdate( $hash, "session_end",   $value );
                 readingsBulkUpdate( $hash, "session_chargeDurationInSeconds", $d->{chargeDurationInSeconds} );
-                readingsBulkUpdate( $hash, "session_firstEnergyTransfer", _transcodeDate($d->{firstEnergyTransferPeriodStart}) );
-                readingsBulkUpdate( $hash, "session_lastEnergyTransfer", $d->{lastEnergyTransferPeriodStart} );
+                my $value = defined $d->{firstEnergyTransferPeriodStart} ? _transcodeDate($d->{firstEnergyTransferPeriodStart}) : 'N/A';
+                readingsBulkUpdate( $hash, "session_firstEnergyTransfer", $value );
+                my $value = defined $d->{lastEnergyTransferPeriodStart} ? _transcodeDate($d->{lastEnergyTransferPeriodStart}) : 'N/A';
+                readingsBulkUpdate( $hash, "session_lastEnergyTransfer", $value );
                 readingsBulkUpdate( $hash, "session_pricePerKWH", $d->{pricePrKwhIncludingVat} );
                 readingsBulkUpdate( $hash, "session_chargingCost", sprintf("%.2f",$d->{costIncludingVat}) );
                 readingsBulkUpdate( $hash, "session_id", $d->{sessionId} );
@@ -792,7 +803,7 @@ sub ResponseHandling {
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate( $hash, "operationModeCode", $d->{chargerOpMode} );
                 readingsBulkUpdate( $hash, "operationMode", $operationModes{ $d->{chargerOpMode} } );
-                readingsBulkUpdate( $hash, "power", $d->{totalPower} );
+                readingsBulkUpdate( $hash, "power", sprintf("%.2f",$d->{totalPower}) );
                 readingsBulkUpdate( $hash, "kWhInSession", sprintf("%.2f",$d->{sessionEnergy}) );
                 readingsBulkUpdate( $hash, "phase",       $d->{outputPhase} );
                 readingsBulkUpdate( $hash, "latestPulse", _transcodeDate($d->{latestPulse}) );
@@ -1043,6 +1054,7 @@ sub _decrypt($) {
 
 sub _transcodeDate{
     my $datestr  = shift;    
+    Log3 'EaseeWallbox', 5, 'date to parse: ' . $datestr;
     my $strp = DateTime::Format::Strptime->new(on_error=>'croak',
         pattern => '%Y-%m-%dT%H:%M:%S%z');
     my $dt = $strp->parse_datetime($datestr);
