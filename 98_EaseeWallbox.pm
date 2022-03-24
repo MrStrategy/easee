@@ -1,6 +1,5 @@
 package FHEM::EaseeWallbox;
-
-# use GPUtils qw(GP_Import GP_Export); hast Du auch weiter unten stehen
+use GPUtils qw(GP_Import GP_Export);
 
 use strict;
 use warnings;
@@ -70,9 +69,7 @@ eval {
 # Import von Funktionen und/oder Variablen aus der FHEM main
 # man kann ::Funktionaname wählen und sich so den Import schenken. Variablen sollten aber
 #   sauber importiert werden
-# use GPUtils qw(GP_Import);
-use GPUtils qw(GP_Import GP_Export)
-  ;    # da Du beide Funktionen aus dem package verwendest
+use GPUtils qw(GP_Import);
 
 ## Import der FHEM Funktionen
 #-- Run before package compilation
@@ -107,17 +104,18 @@ GP_Export(
       )
 );
 
+
 my %gets = (
-    update  => "noArg",
-    health  => "noArg",
+    update   => "noArg",
+    health   => "noArg",
     charger => "noArg",
 );
 
 my %sets = (
     enabled                  => "",
-    disabled                 => "",
+    disabled                 => "",    
     enableSmartButton        => "true,false",
-    authorizationRequired    => "true,false",
+    authorizationRequired    => "true,false",    
     startCharging            => "",
     stopCharging             => "",
     pauseCharging            => "",
@@ -137,6 +135,7 @@ my %sets = (
     deactivateTimer          => "",
 );
 
+
 ## Datapoint, all behind API URI
 my %dpoints = (
     getOAuthToken             => 'accounts/login',
@@ -154,19 +153,17 @@ my %dpoints = (
     getCurrentSession         => 'chargers/#ChargerID#/sessions/ongoing',
     setCableLockState         => 'chargers/#ChargerID#/commands/lock_state',
     setReboot                 => 'chargers/#ChargerID#/commands/reboot',
-    setUpdateFirmware      => 'chargers/#ChargerID#/commands/update_firmware',
-    setEnableSmartCharging => 'chargers/#ChargerID#/commands/smart_charging',
-    setStartCharging       => 'chargers/#ChargerID#/commands/start_charging',
-    setStopCharging        => 'chargers/#ChargerID#/commands/stop_charging',
-    setPauseCharging       => 'chargers/#ChargerID#/commands/pause_charging',
-    setResumeCharging      => 'chargers/#ChargerID#/commands/resume_charging',
-    setToggleCharging      => 'chargers/#ChargerID#/commands/toggle_charging',
-    setOverrideChargingSchedule =>
-      'chargers/#ChargerID#/commands/override_schedule',
-    setPairRFIDTag =>
-      'chargers/#ChargerID#/commands/set_rfid_pairing_mode_async',
-    changeChargerSettings => 'chargers/#ChargerID#/settings',
-    setChargingPrice      => 'sites/#SiteID#/price',
+    setUpdateFirmware         => 'chargers/#ChargerID#/commands/update_firmware',
+    setEnableSmartCharging    => 'chargers/#ChargerID#/commands/smart_charging',
+    setStartCharging          => 'chargers/#ChargerID#/commands/start_charging',
+    setStopCharging           => 'chargers/#ChargerID#/commands/stop_charging',
+    setPauseCharging          => 'chargers/#ChargerID#/commands/pause_charging',
+    setResumeCharging         => 'chargers/#ChargerID#/commands/resume_charging',
+    setToggleCharging         => 'chargers/#ChargerID#/commands/toggle_charging',
+    setOverrideChargingSchedule =>     'chargers/#ChargerID#/commands/override_schedule',
+    setPairRFIDTag             => 'chargers/#ChargerID#/commands/set_rfid_pairing_mode_async',
+    changeChargerSettings      => 'chargers/#ChargerID#/settings',
+    setChargingPrice           => 'sites/#SiteID#/price',
 );
 my %reasonsForNoCurrent = (
     0 => 'OK',                               #charger is allocated current
@@ -177,8 +174,8 @@ my %reasonsForNoCurrent = (
     5 => 'WaitingInQueue',
     6 => 'WaitingInFully'
     , #charged queue (charger assumes one of: EV uses delayed charging, EV charging complete)
-    7 => 'IllegalGridType',
-    8 => 'PrimaryUnitHasNotReceivedCurrentRequestFromSecondaryUnit',
+    7   => 'IllegalGridType',
+    8   => 'PrimaryUnitHasNotReceivedCurrentRequestFromSecondaryUnit',
     50  => 'SecondaryUnitNotRequestingCurrent',    #no car connected...
     51  => 'MaxChargerCurrentTooLow',
     52  => 'MaxDynamicChargerCurrentTooLow',
@@ -204,30 +201,31 @@ my %operationModes = (
 );
 
 my %commandCodes = (
-    1  => "Reboot",
-    2  => "Poll single observation",
-    3  => "Poll all observations",
-    4  => "Upgrade Firmware",
-    5  => "Download settings",
-    7  => "Scan Wifi",
-    11 => "Set smart charging",
-    23 => "Abort charging",
-    25 => "Start Charging",
-    26 => "Stop Charging",
-    29 => "Set enabled",
-    30 => "Set cable lock",
-    11 => "Set smart charging",
-    40 => "Set lightstripe brightness",
-    43 => "Add keys",
-    44 => "Clear keys",
-    48 => "Pause/Resume/Toggle Charging",
-    60 => "Add schedule",
-    61 => "Cear Schedule",
-    62 => "Get Schedule",
-    63 => "Override Schedule",
-    64 => "Purge Schedule",
-    69 => "Set RFID Pairing Mode",
+  1 => "Reboot",
+  2 => "Poll single observation",
+  3 => "Poll all observations",
+  4 => "Upgrade Firmware",
+  5 => "Download settings",
+  7 => "Scan Wifi",
+  11 => "Set smart charging",
+  23 => "Abort charging",
+  25 => "Start Charging",
+  26 => "Stop Charging",
+  29 => "Set enabled",
+  30 => "Set cable lock",
+  11 => "Set smart charging",
+  40 => "Set lightstripe brightness",
+  43 => "Add keys",
+  44 => "Clear keys",
+  48 => "Pause/Resume/Toggle Charging",
+  60 => "Add schedule",
+  61 => "Cear Schedule",
+  62 => "Get Schedule",
+  63 => "Override Schedule",
+  64 => "Purge Schedule",
+  69 => "Set RFID Pairing Mode",  
 );
+
 
 #Private function to evaluate command-lists
 # private funktionen beginnen immer mit _
@@ -240,16 +238,14 @@ sub _GetCmdList {
     my $name     = $hash->{NAME};
 
     #return, if cmd is valid
-    return if ( defined($cmd) and defined( $cmdArray{$cmd} ) );
+    return undef if ( defined($cmd) and defined( $cmdArray{$cmd} ) );
 
     #response for gui or the user, if command is invalid
     my $retVal;
     foreach my $mySet ( keys %cmdArray ) {
 
         #append set-command
-        $retVal = $retVal . " "
-          if ( defined($retVal) )
-          ; # Macht denke ich keinen Sinn da durch my $retVal bereits $retVal definiert ist
+        $retVal = $retVal . " " if ( defined($retVal) );
         $retVal = $retVal . $mySet;
 
         #get options
@@ -257,21 +253,18 @@ sub _GetCmdList {
 
         #append option, if valid
         $retVal = $retVal . ":" . $myOpt
-          if ( defined($myOpt) and ( length($myOpt) > 0 ) );
+            if ( defined($myOpt) and ( length($myOpt) > 0 ) );
         $myOpt = "" if ( !defined($myOpt) );
 
-#Log3 ($name, 5, "parse cmd-table - Set:$mySet, Option:$myOpt, RetVal:$retVal");
+        #Log3 ($name, 5, "parse cmd-table - Set:$mySet, Option:$myOpt, RetVal:$retVal");
     }
     if ( !defined($retVal) ) {
-        return "error while parsing set-table";
+        $retVal = "error while parsing set-table";
     }
-
-    return "Unknown argument $cmd, choose one of " . $retVal;
-
-    # versuche wo wenig wie möglich if else zu verwenden.
-    # else {
-    #     $retVal = "Unknown argument $cmd, choose one of " . $retVal;
-    # }
+    else {
+        $retVal = "Unknown argument $cmd, choose one of " . $retVal;
+    }
+    return $retVal;
 }
 
 sub Initialize {
@@ -292,7 +285,7 @@ sub Initialize {
       . $readingFnAttributes;
 
     #Log3, 'EaseeWallbox', 3, "EaseeWallbox module initialized.";
-    return;
+    return;  
 }
 
 sub Define {
@@ -307,23 +300,22 @@ sub Define {
 
     my $errmsg = '';
 
-# Check parameter(s) - Must be min 4 in total (counts strings not purly parameter, interval is optional)
+    # Check parameter(s) - Must be min 4 in total (counts strings not purly parameter, interval is optional)
     if ( int(@param) < 4 ) {
         $errmsg = return
-"syntax error: define <name> EaseeWallbox <username> <password> [Interval]";
+            "syntax error: define <name> EaseeWallbox <username> <password> [Interval]";
         Log3 $name, 1, "EaseeWallbox $name: " . $errmsg;
         return $errmsg;
     }
 
     #Check if the username is an email address
-    if ( $param[2] =~ /^.+@.+$/x )
-    { # Regular expression without "/x" flag. See page 236 of PBP (RegularExpressions::RequireExtendedFormatting)
+    if ( $param[2] =~ /^.+@.+$/ ) {
         my $username = $param[2];
         $hash->{Username} = $username;
     }
     else {
-        $errmsg =
-"specify valid email address within the field username. Format: define <name> EaseeWallbox <username> <password> [interval]";
+        $errmsg
+            = "specify valid email address within the field username. Format: define <name> EaseeWallbox <username> <password> [interval]";
         Log3 $name, 1, "EaseeWallbox $name: " . $errmsg;
         return $errmsg;
     }
@@ -350,13 +342,12 @@ sub Define {
     #If not an integer abort with failure.
     my $interval = 60;
     if ( defined $param[4] ) {
-        if ( $param[4] =~ /^\d+$/x )
-        { # Regular expression without "/x" flag. See page 236 of PBP (RegularExpressions::RequireExtendedFormatting)
+        if ( $param[4] =~ /^\d+$/ ) {
             $interval = $param[4];
         }
         else {
-            $errmsg =
-"Specify valid integer value for interval. Whole numbers > 5 only. Format: define <name> EaseeWallbox <username> <password> [interval]";
+            $errmsg
+                = "Specify valid integer value for interval. Whole numbers > 5 only. Format: define <name> EaseeWallbox <username> <password> [interval]";
             Log3 $name, 1, "EaseeWallbox $name: " . $errmsg;
             return $errmsg;
         }
@@ -368,31 +359,25 @@ sub Define {
     readingsSingleUpdate( $hash, 'state', 'Undefined', 0 );
 
     #Initial load of data
-    WriteToCloudAPI( $hash, 'getChargers', 'GET' );
+    WriteToCloudAPI($hash, 'getChargers', 'GET');
 
-    Log3 $name, 1,
-      sprintf( "EaseeWallbox_Define %s: Starting timer with interval %s",
-        $name, InternalVal( $name, 'INTERVAL', undef ) );
-    InternalTimer( gettimeofday() + InternalVal( $name, 'INTERVAL', undef ),
-        "FHEM::EaseeWallbox::UpdateDueToTimer", $hash )
-      if ( defined $hash );
-
-    ## return; sollte es nicht geben, ein return; ist per see mit Rückgabe undef
-    return;
+    Log3 $name, 1, sprintf("EaseeWallbox_Define %s: Starting timer with interval %s", $name, InternalVal($name,'INTERVAL', undef));
+    InternalTimer(gettimeofday()+ InternalVal($name,'INTERVAL', undef), "FHEM::EaseeWallbox::UpdateDueToTimer", $hash) if (defined $hash);
+    return undef;
 }
 
 sub Undef {
     my ( $hash, $arg ) = @_;
 
     RemoveInternalTimer($hash);
-    return;
+    return undef;
 }
 
 sub Get {
     my ( $hash, $name, @args ) = @_;
 
     return '"get EaseeWallbox" needs at least one argument'
-      if ( int(@args) < 1 );
+        if ( int(@args) < 1 );
 
     my $opt = shift @args;
 
@@ -401,10 +386,10 @@ sub Get {
     return $cmdTemp if ( defined($cmdTemp) );
 
     $hash->{LOCAL} = 1;
-    WriteToCloudAPI( $hash, 'getChargers', 'GET' ) if $opt eq "charger";
-    RefreshData($hash)                             if $opt eq "update";
+    WriteToCloudAPI($hash, 'getChargers', 'GET')         if $opt eq "charger";
+    RefreshData($hash)                                   if $opt eq "update";      
     delete $hash->{LOCAL};
-    return;
+    return undef;  
 }
 
 sub Set {
@@ -412,40 +397,31 @@ sub Set {
 
     return '"set $name" needs at least one argument' if ( int(@param) < 1 );
 
-    my $opt = shift @param;
-    $value = join( "", @param );
-    my %message;
+    my $opt   = shift @param;
+    my $value = join( "", @param );
 
     #create response, if cmd is wrong or gui asks
     my $cmdTemp = _GetCmdList( $hash, $opt, \%sets );
     return $cmdTemp if ( defined($cmdTemp) );
 
     if ( $opt eq "deactivateTimer" ) {
-
-# Cascading if-elsif chain. See pages 117,118 of PBP (ControlStructures::ProhibitCascadingIfElse) kann man anders machen. Später machen wir das
         RemoveInternalTimer($hash);
         Log3 $name, 1,
-"EaseeWallbox_Set $name: Stopped the timer to automatically update readings";
+            "EaseeWallbox_Set $name: Stopped the timer to automatically update readings";
         readingsSingleUpdate( $hash, 'state', 'Initialized', 0 );
-        return;
+        return undef;
     }
-    elsif ( $opt eq "activateTimer" ) {
-
+     elsif ( $opt eq "activateTimer" ) {
         #Update once manually and then start the timer
         RemoveInternalTimer($hash);
         $hash->{LOCAL} = 1;
         RefreshData($hash);
-        delete $hash->{LOCAL};
-        InternalTimer( gettimeofday() + InternalVal( $name, 'INTERVAL', undef ),
-            "FHEM::EaseeWallbox::UpdateDueToTimer", $hash );
-        readingsSingleUpdate( $hash, 'state', 'Started', 0 );
-        Log3 $name, 1,
-          sprintf(
-"EaseeWallbox_Set %s: Updated readings and started timer to automatically update readings with interval %s",
-            $name, InternalVal( $name, 'INTERVAL', undef ) );
+        delete $hash->{LOCAL};      
+        InternalTimer(gettimeofday()+ InternalVal($name,'INTERVAL', undef), "FHEM::EaseeWallbox::UpdateDueToTimer", $hash);
+        readingsSingleUpdate($hash,'state','Started',0);  
+        Log3 $name, 1, sprintf("EaseeWallbox_Set %s: Updated readings and started timer to automatically update readings with interval %s", $name, InternalVal($name,'INTERVAL', undef));
     }
-    elsif ( $opt eq "interval" )
-    { # interval wird immer über Attribut gesetzt. Also in die Funktion AttrFn aus Initialize
+    elsif ( $opt eq "interval" ) {
         my $interval = shift @param;
 
         $interval = 60 unless defined($interval);
@@ -454,174 +430,154 @@ sub Set {
         Log3 $name, 1, "EaseeWallbox_Set $name: Set interval to" . $interval;
         $hash->{INTERVAL} = $interval;
     }
-    elsif ( $opt eq "cableLock" ) {
-
+     elsif ( $opt eq "cableLock" ) {
+        my %message;
         $message{'state'} = $value;
-        WriteToCloudAPI( $hash, 'setCableLockState', 'POST', \%message );
-    }
+        WriteToCloudAPI($hash, 'setCableLockState', 'POST', \%message)
+    } 
     elsif ( $opt eq "pricePerKWH" ) {
-
+         my %message;
         $message{'currencyId'} = "EUR";
         $message{'vat'}        = "19";
         $message{'costPerKWh'} = shift @param;
-        WriteToCloudAPI( $hash, 'setChargingPrice', 'POST', \%message );
-    }
+        WriteToCloudAPI($hash, 'setChargingPrice', 'POST', \%message)
+    } 
     elsif ( $opt eq "pairRfidTag" ) {
         my $timeout = shift @param;
-
-      #if (defined $timeout and /^\d+$/)         { print "is a whole number\n" }
-        $timeout = '60' if not defined $timeout or $timeout = '';
-
+        #if (defined $timeout and /^\d+$/)         { print "is a whole number\n" }
+        $timeout = '60'             if not defined $timeout or $timeout = '';
+         my %message;
         $message{'timeout'} = "60";
-        WriteToCloudAPI( $hash, 'setPairRFIDTag', 'POST', \%message );
-    }
+        WriteToCloudAPI($hash, 'setPairRFIDTag', 'POST', \%message)
+    } 
     elsif ( $opt eq "enableSmartCharging" ) {
-
+         my %message;
         $message{'smartCharging'} = shift @param;
-        WriteToCloudAPI( $hash, 'changeChargerSettings', 'POST', \%message );
-    }
+        WriteToCloudAPI($hash, 'changeChargerSettings', 'POST', \%message)
+    } 
     elsif ( $opt eq "enabled" ) {
-
+         my %message;
         $message{'enabled'} = "true";
-        WriteToCloudAPI( $hash, 'changeChargerSettings', 'POST', \%message );
-    }
+        WriteToCloudAPI($hash, 'changeChargerSettings', 'POST', \%message)
+    } 
     elsif ( $opt eq "disabled" ) {
-
+         my %message;
         $message{'enabled'} = "false";
-        WriteToCloudAPI( $hash, 'changeChargerSettings', 'POST', \%message );
-    }
+        WriteToCloudAPI($hash, 'changeChargerSettings', 'POST', \%message)
+    } 
     elsif ( $opt eq "authorizationRequired" ) {
-
+         my %message;
         $message{'authorizationRequired'} = shift @param;
-        WriteToCloudAPI( $hash, 'changeChargerSettings', 'POST', \%message );
-    }
+        WriteToCloudAPI($hash, 'changeChargerSettings', 'POST', \%message)
+    } 
     elsif ( $opt eq "enableSmartButton" ) {
-
+         my %message;
         $message{'smartButtonEnabled'} = shift @param;
-        WriteToCloudAPI( $hash, 'changeChargerSettings', 'POST', \%message );
-    }
+        WriteToCloudAPI($hash, 'changeChargerSettings', 'POST', \%message)
+    } 
     elsif ( $opt eq "ledStripBrightness" ) {
-
+         my %message;
         $message{'ledStripBrightness'} = shift @param;
-        WriteToCloudAPI( $hash, 'changeChargerSettings', 'POST', \%message );
-    }
-    else {
-        $hash->{LOCAL} = 1;
-        WriteToCloudAPI( $hash, 'setStartCharging', 'POST' )
-          if $opt eq "startCharging";
-        WriteToCloudAPI( $hash, 'setStopCharging', 'POST' )
-          if $opt eq 'stopCharging';
-        WriteToCloudAPI( $hash, 'setPauseCharging', 'POST' )
-          if $opt eq 'pauseCharging';
-        WriteToCloudAPI( $hash, 'setResumeCharging', 'POST' )
-          if $opt eq 'resumeCharging';
-        WriteToCloudAPI( $hash, 'setToggleCharging', 'POST' )
-          if $opt eq 'toggleCharging';
-        WriteToCloudAPI( $hash, 'setUpdateFirmware', 'POST' )
-          if $opt eq 'updateFirmware';
-        WriteToCloudAPI( $hash, 'setOverrideChargingSchedule', 'POST' )
-          if $opt eq 'overrideChargingSchedule';
-        WriteToCloudAPI( $hash, 'setReboot', 'POST' ) if $opt eq 'reboot';
-        _loadToken($hash)                             if $opt eq 'refreshToken';
+        WriteToCloudAPI($hash, 'changeChargerSettings', 'POST', \%message)
+    } 
+    else 
+    {
+        $hash->{LOCAL} = 1;     
+        WriteToCloudAPI($hash, 'setStartCharging', 'POST')         if $opt eq "startCharging";
+        WriteToCloudAPI($hash, 'setStopCharging', 'POST')          if $opt eq 'stopCharging';  
+        WriteToCloudAPI($hash, 'setPauseCharging', 'POST')         if $opt eq 'pauseCharging';
+        WriteToCloudAPI($hash, 'setResumeCharging', 'POST')        if $opt eq 'resumeCharging';
+        WriteToCloudAPI($hash, 'setToggleCharging', 'POST')        if $opt eq 'toggleCharging';      
+        WriteToCloudAPI($hash, 'setUpdateFirmware', 'POST')        if $opt eq 'updateFirmware';
+        WriteToCloudAPI($hash, 'setOverrideChargingSchedule', 'POST')        if $opt eq 'overrideChargingSchedule';    
+        WriteToCloudAPI($hash, 'setReboot', 'POST')                                   if $opt eq 'reboot';
+        _loadToken($hash)                                                            if $opt eq 'refreshToken';   
         delete $hash->{LOCAL};
     }
-    readingsSingleUpdate( $hash, 'state', 'Initialized', 0 )
-      ; # Die Modulinstanz ist doch nicht erst bei einem set Initialized, das ist doch schon nach dem define. Wenn dann ist hier ein status ala "processing setter" oder so.
-    return;
+    readingsSingleUpdate( $hash, 'state', 'Initialized', 0 );
+    return undef;
 }
 
 sub Attr {
     my ( $cmd, $name, $attrName, $attrVal ) = @_;
-
-    # hier kannst Du das setzen des Intervals umsetzen
     return;
 }
 
-sub RefreshData {
-    my $hash = shift;
-    my $name = $hash->{NAME};
-    WriteToCloudAPI( $hash, 'getChargerSite',            'GET' );
-    WriteToCloudAPI( $hash, 'getChargerState',           'GET' );
-    WriteToCloudAPI( $hash, 'getCurrentSession',         'GET' );
-    WriteToCloudAPI( $hash, 'getChargerConfiguration',   'GET' );
-    WriteToCloudAPI( $hash, 'getChargerSessionsMonthly', 'GET' );
-    WriteToCloudAPI( $hash, 'getChargerSessionsDaily',   'GET' );
-
-    return;    # immer mit einem return eine funktion beenden
+sub RefreshData{
+    my $hash     = shift;    
+    my $name     = $hash->{NAME};
+    WriteToCloudAPI($hash, 'getChargerSite', 'GET');
+    WriteToCloudAPI($hash, 'getChargerState', 'GET');
+    WriteToCloudAPI($hash, 'getCurrentSession', 'GET');
+    WriteToCloudAPI($hash, 'getChargerConfiguration', 'GET');
+    WriteToCloudAPI($hash, 'getChargerSessionsMonthly', 'GET');
+    WriteToCloudAPI($hash, 'getChargerSessionsDaily', 'GET');        
 }
 
-sub UpdateDueToTimer {
+sub UpdateDueToTimer($) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
 
-#local allows call of function without adding new timer.
-#must be set before call ($hash->{LOCAL} = 1) and removed after (delete $hash->{LOCAL};)
+    #local allows call of function without adding new timer.
+    #must be set before call ($hash->{LOCAL} = 1) and removed after (delete $hash->{LOCAL};)
     if ( !$hash->{LOCAL} ) {
         RemoveInternalTimer($hash);
-
         #Log3 "Test", 1, Dumper($hash);
-        InternalTimer( gettimeofday() + InternalVal( $name, 'INTERVAL', undef ),
-            "FHEM::EaseeWallbox::UpdateDueToTimer", $hash );
+        InternalTimer(
+            gettimeofday() + InternalVal( $name, 'INTERVAL', undef ), "FHEM::EaseeWallbox::UpdateDueToTimer", $hash );
     }
-
-    return RefreshData($hash);
+    RefreshData($hash);
 }
 
 sub WriteToCloudAPI {
-    my $hash    = shift;
-    my $dpoint  = shift;
-    my $method  = shift;
+    my $hash   = shift;
+    my $dpoint = shift;
+    my $method = shift;    
     my $message = shift;
-    my $name    = $hash->{NAME};
-    my $url     = $hash->{APIURI} . $dpoints{$dpoint};
+    my $name = $hash->{NAME};
+    my $url = $hash->{APIURI} . $dpoints{$dpoint};
 
     #########
     # CHANGE THIS
     my $payload;
-    $payload = encode_json \%$message if defined $message;
+    $payload  = encode_json \%$message if defined $message;
     my $deviceId = "WC1";
 
-    if ( not defined $hash ) {
-        my $msg =
-          "Error on EaseeWallbox_WriteToCloudAPI. Missing hash variable";
+   if ( not defined $hash ) {
+        my $msg = "Error on EaseeWallbox_WriteToCloudAPI. Missing hash variable";
         Log3 'EaseeWallbox', 1, $msg;
         return $msg;
     }
 
     #Check if chargerID is required in URL and replace or alert.
-    if ( $url =~ m/#ChargerID#/x )
-    { # Regular expression without "/x" flag. See page 236 of PBP (RegularExpressions::RequireExtendedFormatting)
+    if ( $url =~ m/#ChargerID#/ ) {
         my $chargerId = ReadingsVal( $name, 'charger_id', undef );
         if ( not defined $chargerId ) {
-            my $error =
-"Error on EaseeWallbox_WriteToCloudAPI. Missing charger_id. Please ensure basic data is available.";
+            my $error = "Error on EaseeWallbox_WriteToCloudAPI. Missing charger_id. Please ensure basic data is available.";
             Log3 'EaseeWallbox', 1, $error;
             return $error;
         }
-        $url =~ s/#ChargerID#/$chargerId/xg
-          ; # Regular expression without "/x" flag. See page 236 of PBP (RegularExpressions::RequireExtendedFormatting)
+        $url =~ s/#ChargerID#/$chargerId/g;
     }
 
     #Check if siteID is required in URL and replace or alert.
-    if ( $url =~ m/#SiteID#/x )
-    { # Regular expression without "/x" flag. See page 236 of PBP (RegularExpressions::RequireExtendedFormatting)
+    if ( $url =~ m/#SiteID#/ ) {
         my $siteId = ReadingsVal( $name, 'site_id', undef );
         if ( not defined $siteId ) {
-            my $error =
-"Error on EaseeWallbox_WriteToCloudAPI. Missing site_id. Please ensure basic data is available.";
+            my $error = "Error on EaseeWallbox_WriteToCloudAPI. Missing site_id. Please ensure basic data is available.";
             Log3 'EaseeWallbox', 1, $error;
             return $error;
         }
-        $url =~ s/#SiteID#/$siteId/xg
-          ; # Regular expression without "/x" flag. See page 236 of PBP (RegularExpressions::RequireExtendedFormatting)
+        $url =~ s/#SiteID#/$siteId/g;         
     }
 
     my $CurrentTokenData = _loadToken($hash);
-    my $header           = {
-        "Content-Type" => "application/json;charset=UTF-8",
-        "Authorization" =>
-          "$CurrentTokenData->{'tokenType'} $CurrentTokenData->{'accessToken'}"
-    };
+    my $header = 
+        {
+            "Content-Type"  => "application/json;charset=UTF-8",
+            "Authorization" =>
+                "$CurrentTokenData->{'tokenType'} $CurrentTokenData->{'accessToken'}"
+        };
 
     # $method ist GET oder POST
     # bei POST ist $payload gleich data
@@ -647,409 +603,288 @@ sub ResponseHandling {
     my $param = shift;
     my $err   = shift;
     my $data  = shift;
-    my $hash  = $param->{hash};
-    my $name  = $hash->{NAME};
+    my $hash = $param->{hash};
+    my $name = $hash->{NAME};
 
     Log3 $name, 4, "Callback received." . $param->{url};
 
-    if ( $err ne "" )    # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
+    if ( $err ne "" )   # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
     {
-        Log3 $name, 3,
-            "error while requesting "
-          . $param->{url}
-          . " - $err";    # Eintrag fürs Log
+        Log3 $name, 3,"error while requesting ". $param->{url}. " - $err";    # Eintrag fürs Log
         readingsSingleUpdate( $hash, "lastResponse", "ERROR $err", 1 );
-        return;
+        return undef;
     }
 
     my $code = $param->{code};
-    if ( $code == 404 and $param->{dpoint} eq 'getCurrentSession' )
-    {    # Entweder == dann number z.B. 404 oder wenn eq dann String also '404'
-        readingsDelete( $hash, 'session_energy' );
-        readingsDelete( $hash, 'session_start' );
-        readingsDelete( $hash, 'session_end' );
-        readingsDelete( $hash, 'session_chargeDurationInSeconds' );
-        readingsDelete( $hash, 'session_firstEnergyTransfer' );
-        readingsDelete( $hash, 'session_lastEnergyTransfer' );
-        readingsDelete( $hash, 'session_pricePerKWH' );
-        readingsDelete( $hash, 'session_chargingCost' );
-        readingsDelete( $hash, 'session_id' );
-        return;
+    if ($code eq 404 and $param->{dpoint} eq 'getCurrentSession'){
+        readingsDelete($hash, 'session_energy' );
+        readingsDelete($hash, 'session_start' );
+        readingsDelete($hash, 'session_end' );
+        readingsDelete($hash, 'session_chargeDurationInSeconds' );
+        readingsDelete($hash, 'session_firstEnergyTransfer' );
+        readingsDelete($hash, 'session_lastEnergyTransfer' );
+        readingsDelete($hash, 'session_pricePerKWH' );
+        readingsDelete($hash, 'session_chargingCost' );
+        readingsDelete($hash, 'session_id' );
+        return undef;
     }
 
-    if ( $code >= 400 ) {
-        Log3 $name, 3,
-            "HTTPS error while requesting "
-          . $param->{url}
-          . " - $code";    # Eintrag fürs Log
-        readingsSingleUpdate( $hash, "lastResponse", "ERROR: HTTP Code $code",
-            1 );
-        return;
+    if ($code >= 400){
+        Log3 $name, 3,"HTTPS error while requesting ". $param->{url}. " - $code";    # Eintrag fürs Log
+        readingsSingleUpdate( $hash, "lastResponse", "ERROR: HTTP Code $code", 1 );
+        return undef;
     }
 
     Log3 $name, 3,
-      "Received non-blocking data from EaseeWallbox regarding current session ";
+        "Received non-blocking data from EaseeWallbox regarding current session ";
 
     Log3 $name, 4, "FHEM -> EaseeWallbox: " . $param->{url};
     Log3 $name, 4, "FHEM -> EaseeWallbox: " . $param->{message}
-      if ( defined $param->{message} );
+        if ( defined $param->{message} );
     Log3 $name, 4, "EaseeWallbox -> FHEM: " . $data;
     Log3 $name, 5, '$err: ' . $err;
     Log3 $name, 5, "method: " . $param->{method};
     Log3 $name, 2, "Something gone wrong"
-      if ( $data =~ "/EaseeWallboxMode/" );
+        if ( $data =~ "/EaseeWallboxMode/" );
+  
+    my $d;
+    eval {
+        my $d = decode_json($data);
+        Log3 $name, 5, 'Decoded: ' . Dumper($d);
+        Log3 $name, 5, 'Ref of d: ' . ref($d);        
 
-    my $decoded_json;
+        if ( defined $d and $d ne '' and ref($d) eq "HASH" or (ref($d) eq "ARRAY" and $d gt 0)) {
+            if($param->{dpoint} eq 'getChargers')
+            {
+                my $site    =  $d->[0];
+                my $circuit = $site->{circuits}->[0];
+                my $charger = $circuit->{chargers}->[0];
 
-    eval { $decoded_json = decode_json($data) }; # statt eval ist es empfohlen catch try zu verwenden. Machen wir später
-    if ($@) {
-        Log3 $name, 3, "GardenaSmartBridge ($name) - JSON error while request";
-    }
-
-    Log3 $name, 5, 'Decoded: ' . Dumper($decoded_json);
-    Log3 $name, 5, 'Ref of d: ' . ref($decoded_json);
-
-    my $value;
-
-    if (    defined $decoded_json
-        and $decoded_json ne ''
-        and ref($decoded_json) eq "HASH"
-        or ( ref($decoded_json) eq "ARRAY" and $decoded_json > 0 ) )
-    {
-        if ( $param->{dpoint} eq 'getChargers' ) {
-            Processing_DpointGetChargers( $hash, $decode_json );
-            return;
-        }
-
-        if ( $param->{dpoint} eq 'getChargerSessionsDaily' ) {
-            Processing_DpointGetChargerSessionsDaily( $hash, $decode_json );
-            return;
-        }
-
-        # Und so weiter und so weiter mit den einzelnen Funktionen !!!
-
-        if ( $param->{dpoint} eq 'getChargerSessionsMonthly' ) {
-            Log3 $name, 5, 'Evaluating getChargerSessionsMonthly';
-            my @x = $decoded_json;
-            my @a = ( -6 .. -1 );
-            readingsBeginUpdate($hash);
-            for (@a) {
-                Log3 $name, 5, 'laeuft noch: ' . $_;
-                readingsBulkUpdate(
-                    $hash,
-                    "monthly_" . ( $_ + 1 ) . "_energy",
-                    sprintf(
-                        "%.2f", $decoded_json->[$_]->{'totalEnergyUsage'}
-                    )
-                );
-                readingsBulkUpdate(
-                    $hash,
-                    "monthly_" . ( $_ + 1 ) . "_cost",
-                    sprintf( "%.2f", $decoded_json->[$_]->{'totalCost'} )
-                );
+                readingsBeginUpdate($hash);
+                my $chargerId = $charger->{id};
+                readingsBulkUpdate( $hash, "site_id",   $site->{id} ); 
+                readingsBulkUpdate( $hash, "site_key",    $site->{siteKey} );               
+                readingsBulkUpdate( $hash, "charger_id",   $chargerId );
+                readingsBulkUpdate( $hash, "charger_name", $charger->{name} );
+                readingsBulkUpdate( $hash, "lastResponse", 'OK - getReaders', 1);
+                readingsEndUpdate( $hash, 1 );
+                WriteToCloudAPI($hash, 'getChargerConfiguration', 'GET');
+                return;
             }
-            readingsEndUpdate( $hash, 1 );
-            return;
+
+            if($param->{dpoint} eq 'getChargerSessionsDaily')
+            {
+                Log3 $name, 5, 'Evaluating getChargerSessionsDaily';
+                my @x   =  $d;
+                my @a = (-5..-1);
+                readingsBeginUpdate($hash);
+                for(@a){
+                    Log3 $name, 5, 'laeuft noch: '. $_;
+                    readingsBulkUpdate( $hash, "daily_".($_ +1)."_energy",   sprintf("%.2f",$d->[$_]->{'totalEnergyUsage'}) ); 
+                    readingsBulkUpdate( $hash, "daily_".($_ +1)."_cost",   sprintf("%.2f",$d->[$_]->{'totalCost'}) ); 
+                }
+                readingsEndUpdate( $hash, 1 );
+                return;
+            }
+
+            if($param->{dpoint} eq 'getChargerSessionsMonthly')
+            {
+                Log3 $name, 5, 'Evaluating getChargerSessionsMonthly';
+                my @x   =  $d;
+                my @a = (-6..-1);
+                readingsBeginUpdate($hash);
+                for(@a){
+                    Log3 $name, 5, 'laeuft noch: '. $_;
+                    readingsBulkUpdate( $hash, "monthly_".($_ +1)."_energy",   sprintf("%.2f",$d->[$_]->{'totalEnergyUsage'}) ); 
+                    readingsBulkUpdate( $hash, "monthly_".($_ +1)."_cost",   sprintf("%.2f",$d->[$_]->{'totalCost'}) ); 
+                }
+                readingsEndUpdate( $hash, 1 );
+                return;
+            }
+
+
+            if($param->{dpoint} eq 'getChargerConfiguration')
+            {
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate( $hash, "isEnabled", $d->{isEnabled} );
+                readingsBulkUpdate( $hash, "isCablePermanentlyLocked", $d->{lockCablePermanently} );
+                readingsBulkUpdate($hash, "isAuthorizationRequired", $d->{authorizationRequired});
+                readingsBulkUpdate( $hash, "isRemoteStartRequired", $d->{remoteStartRequired} );
+                readingsBulkUpdate( $hash, "isSmartButtonEnabled", $d->{smartButtonEnabled} );
+                readingsBulkUpdate( $hash, "wiFiSSID", $d->{wiFiSSID} );
+                readingsBulkUpdate( $hash, "phaseModeId", $d->{phaseMode} );
+                readingsBulkUpdate( $hash, "phaseMode",$phaseModes{ $d->{phaseMode} } );
+                readingsBulkUpdate($hash, "isLocalAuthorizationRequired",$d->{localAuthorizationRequired});        
+                readingsBulkUpdate( $hash, "maxChargerCurrent", $d->{maxChargerCurrent} );
+                readingsBulkUpdate( $hash, "ledStripBrightness", $d->{ledStripBrightness} );
+                #readingsBulkUpdate( $hash, "charger_offlineChargingMode",
+                #    $d->{offlineChargingMode} );
+                #readingsBulkUpdate( $hash, "charger_circuitMaxCurrentP1",
+                #    $d->{circuitMaxCurrentP1} );
+                #readingsBulkUpdate( $hash, "charger_circuitMaxCurrentP2",
+                #    $d->{circuitMaxCurrentP2} );
+                #readingsBulkUpdate( $hash, "charger_circuitMaxCurrentP3",
+                #    $d->{circuitMaxCurrentP3} );
+                #readingsBulkUpdate( $hash, "charger_enableIdleCurrent",
+                #    $d->{enableIdleCurrent} );
+                #readingsBulkUpdate(
+                #    $hash,
+                #    "charger_limitToSinglePhaseCharging",
+                #    $d->{limitToSinglePhaseCharging}
+                #);
+
+                #readingsBulkUpdate( $hash, "charger_localNodeType",
+                #    $d->{localNodeType} );
+
+                #readingsBulkUpdate( $hash, "charger_localRadioChannel",
+                #    $d->{localRadioChannel} );
+                #readingsBulkUpdate( $hash, "charger_localShortAddress",
+                #    $d->{localShortAddress} );
+                #readingsBulkUpdate(
+                #    $hash,
+                #    "charger_localParentAddrOrNumOfNodes",
+                #    $d->{localParentAddrOrNumOfNodes}
+                #);
+                #readingsBulkUpdate(
+                #    $hash,
+                #    "charger_localPreAuthorizeEnabled",
+                #    $d->{localPreAuthorizeEnabled}
+                #);
+                #readingsBulkUpdate(
+                #    $hash,
+                #    "charger_allowOfflineTxForUnknownId",
+                #    $d->{allowOfflineTxForUnknownId}
+                #);
+                #readingsBulkUpdate( $hash, "chargingSchedule",
+                #    $d->{chargingSchedule} );
+                readingsBulkUpdate( $hash, "lastResponse", 'OK - getChargerConfig', 1);
+                readingsEndUpdate( $hash, 1 );
+                return undef;
+            }
+
+            if($param->{dpoint} eq 'getCurrentSession')
+            {
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate( $hash, "session_energy", sprintf("%.2f",$d->{sessionEnergy}) );
+                my $value = defined $d->{sessionStart} ? _transcodeDate($d->{sessionStart}) : 'N/A';
+                readingsBulkUpdate( $hash, "session_start",  $value );                                  
+                my $value = defined $d->{sessionEnd} ? _transcodeDate($d->{sessionEnd}) : 'N/A';
+                readingsBulkUpdate( $hash, "session_end",   $value );
+                readingsBulkUpdate( $hash, "session_chargeDurationInSeconds", $d->{chargeDurationInSeconds} );
+                my $value = defined $d->{firstEnergyTransferPeriodStart} ? _transcodeDate($d->{firstEnergyTransferPeriodStart}) : 'N/A';
+                readingsBulkUpdate( $hash, "session_firstEnergyTransfer", $value );
+                my $value = defined $d->{lastEnergyTransferPeriodStart} ? _transcodeDate($d->{lastEnergyTransferPeriodStart}) : 'N/A';
+                readingsBulkUpdate( $hash, "session_lastEnergyTransfer", $value );
+                readingsBulkUpdate( $hash, "session_pricePerKWH", $d->{pricePrKwhIncludingVat} );
+                readingsBulkUpdate( $hash, "session_chargingCost", sprintf("%.2f",$d->{costIncludingVat}) );
+                readingsBulkUpdate( $hash, "session_id", $d->{sessionId} );
+                readingsBulkUpdate( $hash, "lastResponse", 'OK - getCurrentSession', 1);
+                readingsEndUpdate( $hash, 1 );
+                return undef;
+            }
+
+            if($param->{dpoint} eq 'getChargerSite')
+            {
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate( $hash, "cost_perKWh", $d->{costPerKWh} );
+                readingsBulkUpdate( $hash, "cost_perKwhExcludeVat", $d->{costPerKwhExcludeVat} );
+                readingsBulkUpdate( $hash, "cost_vat",          $d->{vat} );
+                readingsBulkUpdate( $hash, "cost_currency",     $d->{currencyId} );
+                #readingsBulkUpdate( $hash, "site_ratedCurrent", $d->{ratedCurrent} );
+                #readingsBulkUpdate( $hash, "site_createdOn",    $d->{createdOn} );
+                #readingsBulkUpdate( $hash, "site_updatedOn",    $d->{updatedOn} );
+                readingsBulkUpdate( $hash, "lastResponse", 'OK - getChargerSite', 1);
+                readingsEndUpdate( $hash, 1 );
+                return undef;            
+            }
+
+            if($param->{dpoint} eq 'getChargerState')
+            {
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate( $hash, "operationModeCode", $d->{chargerOpMode} );
+                readingsBulkUpdate( $hash, "operationMode", $operationModes{ $d->{chargerOpMode} } );
+                readingsBulkUpdate( $hash, "power", sprintf("%.2f",$d->{totalPower}) );
+                readingsBulkUpdate( $hash, "kWhInSession", sprintf("%.2f",$d->{sessionEnergy}) );
+                readingsBulkUpdate( $hash, "phase",       $d->{outputPhase} );
+                readingsBulkUpdate( $hash, "latestPulse", _transcodeDate($d->{latestPulse}) );
+                readingsBulkUpdate( $hash, "current", $d->{outputCurrent} );
+                readingsBulkUpdate( $hash, "dynamicCurrent", $d->{dynamicChargerCurrent} );
+                readingsBulkUpdate( $hash, "reasonCodeForNoCurrent", $d->{reasonForNoCurrent} );
+                readingsBulkUpdate( $hash, "reasonForNoCurrent", $reasonsForNoCurrent{ $d->{reasonForNoCurrent} } );
+                readingsBulkUpdate( $hash, "errorCode",      $d->{errorCode} );
+                readingsBulkUpdate( $hash, "fatalErrorCode", $d->{fatalErrorCode} );
+                readingsBulkUpdate( $hash, "lifetimeEnergy", sprintf("%.2f",$d->{lifetimeEnergy}) );
+                readingsBulkUpdate( $hash, "online",         $d->{isOnline} );
+                readingsBulkUpdate( $hash, "voltage",        sprintf("%.2f",$d->{voltage}) );
+                readingsBulkUpdate( $hash, "wifi_rssi",      $d->{wiFiRSSI} );
+                readingsBulkUpdate( $hash, "wifi_apEnabled", $d->{wiFiAPEnabled} );
+                readingsBulkUpdate( $hash, "cell_rssi",      $d->{cellRSSI} );
+                readingsBulkUpdate( $hash, "lastResponse", 'OK - getChargerState', 1);
+                readingsEndUpdate( $hash, 1 );
+                return undef;            
+            }
+
+            $d = $d->[0]   if ref($d) eq "ARRAY";
+            readingsSingleUpdate( $hash, "lastResponse", 'OK - Action: '. $commandCodes{$d->{commandId}}, 1 )       if defined $d->{commandId};
+            readingsSingleUpdate( $hash, "lastResponse", 'ERROR: '. $d->{title}.' ('.$d->{status}.')', 1 )     if defined $d->{status} and defined $d->{title};
+            return undef;
+        }  else {
+            readingsSingleUpdate( $hash, "lastResponse", 'OK - empty', 1);
+            return undef;
         }
-
-        if ( $param->{dpoint} eq 'getChargerConfiguration' ) {
-            readingsBeginUpdate($hash);
-            readingsBulkUpdate( $hash, "isEnabled",
-                $decoded_json->{isEnabled} );
-            readingsBulkUpdate( $hash, "isCablePermanentlyLocked",
-                $decoded_json->{lockCablePermanently} );
-            readingsBulkUpdate( $hash, "isAuthorizationRequired",
-                $decoded_json->{authorizationRequired} );
-            readingsBulkUpdate( $hash, "isRemoteStartRequired",
-                $decoded_json->{remoteStartRequired} );
-            readingsBulkUpdate( $hash, "isSmartButtonEnabled",
-                $decoded_json->{smartButtonEnabled} );
-            readingsBulkUpdate( $hash, "wiFiSSID", $decoded_json->{wiFiSSID} );
-            readingsBulkUpdate( $hash, "phaseModeId",
-                $decoded_json->{phaseMode} );
-            readingsBulkUpdate( $hash, "phaseMode",
-                $phaseModes{ $decoded_json->{phaseMode} } );
-            readingsBulkUpdate(
-                $hash,
-                "isLocalAuthorizationRequired",
-                $decoded_json->{localAuthorizationRequired}
-            );
-            readingsBulkUpdate( $hash, "maxChargerCurrent",
-                $decoded_json->{maxChargerCurrent} );
-            readingsBulkUpdate( $hash, "ledStripBrightness",
-                $decoded_json->{ledStripBrightness} );
-
-            #readingsBulkUpdate( $hash, "charger_offlineChargingMode",
-            #    $decoded_json->{offlineChargingMode} );
-            #readingsBulkUpdate( $hash, "charger_circuitMaxCurrentP1",
-            #    $decoded_json->{circuitMaxCurrentP1} );
-            #readingsBulkUpdate( $hash, "charger_circuitMaxCurrentP2",
-            #    $decoded_json->{circuitMaxCurrentP2} );
-            #readingsBulkUpdate( $hash, "charger_circuitMaxCurrentP3",
-            #    $decoded_json->{circuitMaxCurrentP3} );
-            #readingsBulkUpdate( $hash, "charger_enableIdleCurrent",
-            #    $decoded_json->{enableIdleCurrent} );
-            #readingsBulkUpdate(
-            #    $hash,
-            #    "charger_limitToSinglePhaseCharging",
-            #    $decoded_json->{limitToSinglePhaseCharging}
-            #);
-
-            #readingsBulkUpdate( $hash, "charger_localNodeType",
-            #    $decoded_json->{localNodeType} );
-
-            #readingsBulkUpdate( $hash, "charger_localRadioChannel",
-            #    $decoded_json->{localRadioChannel} );
-            #readingsBulkUpdate( $hash, "charger_localShortAddress",
-            #    $decoded_json->{localShortAddress} );
-            #readingsBulkUpdate(
-            #    $hash,
-            #    "charger_localParentAddrOrNumOfNodes",
-            #    $decoded_json->{localParentAddrOrNumOfNodes}
-            #);
-            #readingsBulkUpdate(
-            #    $hash,
-            #    "charger_localPreAuthorizeEnabled",
-            #    $decoded_json->{localPreAuthorizeEnabled}
-            #);
-            #readingsBulkUpdate(
-            #    $hash,
-            #    "charger_allowOfflineTxForUnknownId",
-            #    $decoded_json->{allowOfflineTxForUnknownId}
-            #);
-            #readingsBulkUpdate( $hash, "chargingSchedule",
-            #    $decoded_json->{chargingSchedule} );
-            readingsBulkUpdate( $hash, "lastResponse",
-                'OK - getChargerConfig', 1 );
-            readingsEndUpdate( $hash, 1 );
-            return;
-        }
-
-        if ( $param->{dpoint} eq 'getCurrentSession' ) {
-            readingsBeginUpdate($hash);
-            readingsBulkUpdate( $hash, "session_energy",
-                sprintf( "%.2f", $decoded_json->{sessionEnergy} ) );
-            $value =
-              defined $decoded_json->{sessionStart}
-              ? _transcodeDate( $decoded_json->{sessionStart} )
-              : 'N/A';
-            readingsBulkUpdate( $hash, "session_start", $value );
-            $value =
-              defined $decoded_json->{sessionEnd}
-              ? _transcodeDate( $decoded_json->{sessionEnd} )
-              : 'N/A';
-            readingsBulkUpdate( $hash, "session_end", $value );
-            readingsBulkUpdate(
-                $hash,
-                "session_chargeDurationInSeconds",
-                $decoded_json->{chargeDurationInSeconds}
-            );
-            $value =
-              defined $decoded_json->{firstEnergyTransferPeriodStart}
-              ? _transcodeDate(
-                $decoded_json->{firstEnergyTransferPeriodStart} )
-              : 'N/A';
-            readingsBulkUpdate( $hash, "session_firstEnergyTransfer", $value );
-            $value =
-              defined $decoded_json->{lastEnergyTransferPeriodStart}
-              ? _transcodeDate( $decoded_json->{lastEnergyTransferPeriodStart} )
-              : 'N/A';
-            readingsBulkUpdate( $hash, "session_lastEnergyTransfer", $value );
-            readingsBulkUpdate( $hash, "session_pricePerKWH",
-                $decoded_json->{pricePrKwhIncludingVat} );
-            readingsBulkUpdate( $hash, "session_chargingCost",
-                sprintf( "%.2f", $decoded_json->{costIncludingVat} ) );
-            readingsBulkUpdate( $hash, "session_id",
-                $decoded_json->{sessionId} );
-            readingsBulkUpdate( $hash, "lastResponse",
-                'OK - getCurrentSession', 1 );
-            readingsEndUpdate( $hash, 1 );
-            return;
-        }
-
-        if ( $param->{dpoint} eq 'getChargerSite' ) {
-            readingsBeginUpdate($hash);
-            readingsBulkUpdate( $hash, "cost_perKWh",
-                $decoded_json->{costPerKWh} );
-            readingsBulkUpdate( $hash, "cost_perKwhExcludeVat",
-                $decoded_json->{costPerKwhExcludeVat} );
-            readingsBulkUpdate( $hash, "cost_vat", $decoded_json->{vat} );
-            readingsBulkUpdate( $hash, "cost_currency",
-                $decoded_json->{currencyId} );
-
-#readingsBulkUpdate( $hash, "site_ratedCurrent", $decoded_json->{ratedCurrent} );
-#readingsBulkUpdate( $hash, "site_createdOn",    $decoded_json->{createdOn} );
-#readingsBulkUpdate( $hash, "site_updatedOn",    $decoded_json->{updatedOn} );
-            readingsBulkUpdate( $hash, "lastResponse",
-                'OK - getChargerSite', 1 );
-            readingsEndUpdate( $hash, 1 );
-            return;
-        }
-
-        if ( $param->{dpoint} eq 'getChargerState' ) {
-            readingsBeginUpdate($hash);
-            readingsBulkUpdate( $hash, "operationModeCode",
-                $decoded_json->{chargerOpMode} );
-            readingsBulkUpdate( $hash, "operationMode",
-                $operationModes{ $decoded_json->{chargerOpMode} } );
-            readingsBulkUpdate( $hash, "power",
-                sprintf( "%.2f", $decoded_json->{totalPower} ) );
-            readingsBulkUpdate( $hash, "kWhInSession",
-                sprintf( "%.2f", $decoded_json->{sessionEnergy} ) );
-            readingsBulkUpdate( $hash, "phase", $decoded_json->{outputPhase} );
-            readingsBulkUpdate( $hash, "latestPulse",
-                _transcodeDate( $decoded_json->{latestPulse} ) );
-            readingsBulkUpdate( $hash, "current",
-                $decoded_json->{outputCurrent} );
-            readingsBulkUpdate( $hash, "dynamicCurrent",
-                $decoded_json->{dynamicChargerCurrent} );
-            readingsBulkUpdate( $hash, "reasonCodeForNoCurrent",
-                $decoded_json->{reasonForNoCurrent} );
-            readingsBulkUpdate( $hash, "reasonForNoCurrent",
-                $reasonsForNoCurrent{ $decoded_json->{reasonForNoCurrent} } );
-            readingsBulkUpdate( $hash, "errorCode",
-                $decoded_json->{errorCode} );
-            readingsBulkUpdate( $hash, "fatalErrorCode",
-                $decoded_json->{fatalErrorCode} );
-            readingsBulkUpdate( $hash, "lifetimeEnergy",
-                sprintf( "%.2f", $decoded_json->{lifetimeEnergy} ) );
-            readingsBulkUpdate( $hash, "online", $decoded_json->{isOnline} );
-            readingsBulkUpdate( $hash, "voltage",
-                sprintf( "%.2f", $decoded_json->{voltage} ) );
-            readingsBulkUpdate( $hash, "wifi_rssi", $decoded_json->{wiFiRSSI} );
-            readingsBulkUpdate( $hash, "wifi_apEnabled",
-                $decoded_json->{wiFiAPEnabled} );
-            readingsBulkUpdate( $hash, "cell_rssi", $decoded_json->{cellRSSI} );
-            readingsBulkUpdate( $hash, "lastResponse",
-                'OK - getChargerState', 1 );
-            readingsEndUpdate( $hash, 1 );
-            return;
-        }
-
-        $decoded_json = $decoded_json->[0] if ref($decoded_json) eq "ARRAY";
-        readingsSingleUpdate( $hash, "lastResponse",
-            'OK - Action: ' . $commandCodes{ $decoded_json->{commandId} }, 1 )
-          if defined $decoded_json->{commandId};
-        readingsSingleUpdate(
-            $hash,
-            "lastResponse",
-            'ERROR: '
-              . $decoded_json->{title} . ' ('
-              . $decoded_json->{status} . ')',
-            1
-          )
-          if defined $decoded_json->{status} and defined $decoded_json->{title};
-        return;
-    }
-    else {
-        readingsSingleUpdate( $hash, "lastResponse", 'OK - empty', 1 );
-        return;
-    }
+    };
 
     if ($@) {
-        readingsSingleUpdate( $hash, "lastResponse",
-            'ERROR while deconding response: ' . $@, 1 );
+        readingsSingleUpdate( $hash, "lastResponse", 'ERROR while deconding response: '. $@, 1 );
         Log3 $name, 5, 'Failure decoding: ' . $@;
-    }
+    } 
 
     return;
 }
 
-sub Processing_DpointGetChargers {
-    my $hash         = shift;
-    my $decoded_json = shift;
-
-    my $site    = $decoded_json->[0];
-    my $circuit = $site->{circuits}->[0];
-    my $charger = $circuit->{chargers}->[0];
-
-    readingsBeginUpdate($hash);
-    my $chargerId = $charger->{id};
-    readingsBulkUpdate( $hash, "site_id",      $site->{id} );
-    readingsBulkUpdate( $hash, "site_key",     $site->{siteKey} );
-    readingsBulkUpdate( $hash, "charger_id",   $chargerId );
-    readingsBulkUpdate( $hash, "charger_name", $charger->{name} );
-    readingsBulkUpdate( $hash, "lastResponse", 'OK - getReaders', 1 );
-    readingsEndUpdate( $hash, 1 );
-
-    WriteToCloudAPI( $hash, 'getChargerConfiguration', 'GET' );
-
-    return;
-}
-
-sub Processing_DpointGetChargerSessionsDaily {
-    my $hash         = shift;
-    my $decoded_json = shift;
-
-    my $name = $hash->{NAME};
-
-    Log3 $name, 5, 'Evaluating getChargerSessionsDaily';
-
-    my @x = $decoded_json;
-    my @a = ( -5 .. -1 );
-
-    readingsBeginUpdate($hash);
-    for (@a) {
-        Log3 $name, 5, 'laeuft noch: ' . $_;
-        readingsBulkUpdate(
-            $hash,
-            "daily_" . ( $_ + 1 ) . "_energy",
-            sprintf( "%.2f", $decoded_json->[$_]->{'totalEnergyUsage'} )
-        );
-        readingsBulkUpdate(
-            $hash,
-            "daily_" . ( $_ + 1 ) . "_cost",
-            sprintf( "%.2f", $decoded_json->[$_]->{'totalCost'} )
-        );
-    }
-
-    readingsEndUpdate( $hash, 1 );
-
-    return;
-}
 
 sub _loadToken {
     my $hash          = shift;
     my $name          = $hash->{NAME};
     my $tokenLifeTime = $hash->{TOKEN_LIFETIME};
     $tokenLifeTime = 0 if ( !defined $tokenLifeTime || $tokenLifeTime eq '' );
-    my $token;
+    my $Token = undef;
 
-    $token = $hash->{'.TOKEN'};
+    $Token = $hash->{'.TOKEN'};
 
     if ( $@ || $tokenLifeTime < gettimeofday() ) {
         Log3 $name, 5,
-          "EaseeWallbox $name" . ": "
-          . "Error while loading: $@ ,requesting new one"
-          if $@;
+            "EaseeWallbox $name" . ": "
+            . "Error while loading: $@ ,requesting new one"
+            if $@;
         Log3 $name, 5,
-          "EaseeWallbox $name" . ": " . "Token is expired, requesting new one"
-          if $tokenLifeTime < gettimeofday();
-        $token = _newTokenRequest($hash);
+            "EaseeWallbox $name" . ": "
+            . "Token is expired, requesting new one"
+            if $tokenLifeTime < gettimeofday();
+        $Token = _newTokenRequest($hash);
     }
     else {
         Log3 $name, 5,
-            "EaseeWallbox $name" . ": "
-          . "Token expires at "
-          . localtime($tokenLifeTime);
+              "EaseeWallbox $name" . ": "
+            . "Token expires at "
+            . localtime($tokenLifeTime);
 
         # if token is about to expire, refresh him
         if ( ( $tokenLifeTime - 3700 ) < gettimeofday() ) {
             Log3 $name, 5,
-              "EaseeWallbox $name" . ": "
-              . "Token will expire soon, refreshing";
-            $token = _tokenRefresh($hash);
+                "EaseeWallbox $name" . ": "
+                . "Token will expire soon, refreshing";
+            $Token = _tokenRefresh($hash);
         }
     }
-
-    $token = $token ? $token : undef;
-    return $token;
+    return $Token if $Token;
 }
 
 sub _newTokenRequest {
-    my $hash     = shift;
-    my $name     = $hash->{NAME};
-    my $password = _decrypt( InternalVal( $name, 'Password', undef ) );
+    my $hash = shift;
+    my $name = $hash->{NAME};
+    my $password
+        = _decrypt( InternalVal( $name, 'Password', undef ) );
     my $username = InternalVal( $name, 'Username', undef );
 
     Log3 $name, 5, "EaseeWallbox $name" . ": " . "calling NewTokenRequest()";
@@ -1075,17 +910,17 @@ sub _newTokenRequest {
 
     if ( $err ne "" ) {
         Log3 $name, 3,
-            "EaseeWallbox $name" . ": "
-          . "NewTokenRequest: Error while requesting "
-          . $param->{url}
-          . " - $err";
+              "EaseeWallbox $name" . ": "
+            . "NewTokenRequest: Error while requesting "
+            . $param->{url}
+            . " - $err";
     }
     elsif ( $returnData ne "" ) {
         Log3 $name, 5, "url " . $param->{url} . " returned: $returnData";
         my $decoded_data = eval { decode_json($returnData) };
         if ($@) {
             Log3 $name, 3, "EaseeWallbox $name" . ": "
-              . "NewTokenRequest: decode_json failed, invalid json. error: $@ ";
+                . "NewTokenRequest: decode_json failed, invalid json. error: $@ ";
         }
         else {
             #write token data in hash
@@ -1095,17 +930,15 @@ sub _newTokenRequest {
 
             # token lifetime management
             if ( defined($decoded_data) ) {
-                $hash->{TOKEN_LIFETIME} =
-                  gettimeofday() + $decoded_data->{'expiresIn'};
+                $hash->{TOKEN_LIFETIME}
+                    = gettimeofday() + $decoded_data->{'expiresIn'};
             }
             $hash->{TOKEN_LIFETIME_HR} = localtime( $hash->{TOKEN_LIFETIME} );
             Log3 $name, 5,
-                "EaseeWallbox $name" . ": "
-              . "Retrived new authentication token successfully. Valid until "
-              . localtime( $hash->{TOKEN_LIFETIME} );
-
-# $hash->{STATE} = "reachable";       # niemals $hash->{STATE} über demn Hash direkt zuweisen
-            readingsSingleUpdate( $hash, 'state', 'reachable', 1 );
+                  "EaseeWallbox $name" . ": "
+                . "Retrived new authentication token successfully. Valid until "
+                . localtime( $hash->{TOKEN_LIFETIME} );
+            $hash->{STATE} = "reachable";
             return $decoded_data;
         }
     }
@@ -1143,13 +976,11 @@ sub _tokenRefresh {
 
     if ( $err ne "" ) {
         Log3 $name, 3,
-            "EaseeWallbox $name" . ": "
-          . "TokenRefresh: Error in token retrival while requesting "
-          . $param->{url}
-          . " - $err";
-
-        # $hash->{STATE} = "error";
-        readingsSingleUpdate( $hash, 'state', 'error', 1 );
+              "EaseeWallbox $name" . ": "
+            . "TokenRefresh: Error in token retrival while requesting "
+            . $param->{url}
+            . " - $err";
+        $hash->{STATE} = "error";
     }
 
     elsif ( $returnData ne "" ) {
@@ -1158,12 +989,10 @@ sub _tokenRefresh {
 
         if ($@) {
             Log3 $name, 3,
-              "EaseeWallbox $name" . ": "
-              . "TokenRefresh: decode_json failed, invalid json. error:$@\n"
-              if $@;
-
-            # $hash->{STATE} = "error";
-            readingsSingleUpdate( $hash, 'state', 'error', 1 );
+                "EaseeWallbox $name" . ": "
+                . "TokenRefresh: decode_json failed, invalid json. error:$@\n"
+                if $@;
+            $hash->{STATE} = "error";
         }
         else {
             #write token data in file
@@ -1173,30 +1002,26 @@ sub _tokenRefresh {
             }
 
             # token lifetime management
-            $hash->{TOKEN_LIFETIME} =
-              gettimeofday() + $decoded_data->{'expires_in'};
+            $hash->{TOKEN_LIFETIME}
+                = gettimeofday() + $decoded_data->{'expires_in'};
             $hash->{TOKEN_LIFETIME_HR} = localtime( $hash->{TOKEN_LIFETIME} );
             Log3 $name, 5,
-                "EaseeWallbox $name" . ": "
-              . "TokenRefresh: Refreshed authentication token successfully. Valid until "
-              . localtime( $hash->{TOKEN_LIFETIME} );
-
-            # $hash->{STATE} = "reachable";
-            readingsSingleUpdate( $hash, 'state', 'reachable', 1 );
+                  "EaseeWallbox $name" . ": "
+                . "TokenRefresh: Refreshed authentication token successfully. Valid until "
+                . localtime( $hash->{TOKEN_LIFETIME} );
+            $hash->{STATE} = "reachable";
             return $decoded_data;
         }
     }
     return;
 }
 
-sub _encrypt {
+sub _encrypt($) {
     my ($decoded) = @_;
     my $key = getUniqueId();
     my $encoded;
 
-    return $decoded
-      if ( $decoded =~ /crypt:/x )
-      ; # Regular expression without "/x" flag. See page 236 of PBP (RegularExpressions::RequireExtendedFormatting)
+    return $decoded if ( $decoded =~ /crypt:/ );
 
     for my $char ( split //, $decoded ) {
         my $encode = chop($key);
@@ -1207,21 +1032,16 @@ sub _encrypt {
     return 'crypt:' . $encoded;
 }
 
-sub _decrypt {
+sub _decrypt($) {
     my ($encoded) = @_;
     my $key = getUniqueId();
     my $decoded;
 
-    return $encoded
-      if ( $encoded !~ /crypt:/x )
-      ; # Regular expression without "/x" flag. See page 236 of PBP (RegularExpressions::RequireExtendedFormatting)
+    return $encoded if ( $encoded !~ /crypt:/ );
 
-    $encoded = $1
-      if ( $encoded =~ /crypt:(.*)/x )
-      ; # Regular expression without "/x" flag. See page 236 of PBP (RegularExpressions::RequireExtendedFormatting)
+    $encoded = $1 if ( $encoded =~ /crypt:(.*)/ );
 
-    for my $char ( map { pack( 'C', hex($_) ) } ( $encoded =~ /(..)/xg ) )
-    { # Regular expression without "/x" flag. See page 236 of PBP (RegularExpressions::RequireExtendedFormatting)
+    for my $char ( map { pack( 'C', hex($_) ) } ( $encoded =~ /(..)/g ) ) {
         my $decode = chop($key);
         $decoded .= chr( ord($char) ^ ord($decode) );
         $key = $decode . $key;
@@ -1232,20 +1052,18 @@ sub _decrypt {
 
 1;
 
-sub _transcodeDate {
-    my $datestr = shift;
+sub _transcodeDate{
+    my $datestr  = shift;    
     Log3 'EaseeWallbox', 5, 'date to parse: ' . $datestr;
-    my $strp = DateTime::Format::Strptime->new(
-        on_error => 'croak',
-        pattern  => '%Y-%m-%dT%H:%M:%S%z'
-    );
+    my $strp = DateTime::Format::Strptime->new(on_error=>'croak',
+        pattern => '%Y-%m-%dT%H:%M:%S%z');
     my $dt = $strp->parse_datetime($datestr);
     $dt->set_time_zone('Europe/Berlin');
-
     return $dt->strftime('%Y-%m-%d %H:%M:%S');
 }
 
-1;    # Ein Modul muss immer mit 1; enden
+
+
 
 =pod
 =begin html
