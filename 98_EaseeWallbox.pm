@@ -1,5 +1,6 @@
 package FHEM::EaseeWallbox;
-use GPUtils qw(GP_Import GP_Export);
+
+# use GPUtils qw(GP_Import GP_Export); hast Du auch weiter unten stehen
 
 use strict;
 use warnings;
@@ -69,7 +70,9 @@ eval {
 # Import von Funktionen und/oder Variablen aus der FHEM main
 # man kann ::Funktionaname wählen und sich so den Import schenken. Variablen sollten aber
 #   sauber importiert werden
-use GPUtils qw(GP_Import);
+# use GPUtils qw(GP_Import);
+use GPUtils qw(GP_Import GP_Export)
+  ;    # da Du beide Funktionen aus dem package verwendest
 
 ## Import der FHEM Funktionen
 #-- Run before package compilation
@@ -104,18 +107,17 @@ GP_Export(
       )
 );
 
-
 my %gets = (
-    update   => "noArg",
-    health   => "noArg",
+    update  => "noArg",
+    health  => "noArg",
     charger => "noArg",
 );
 
 my %sets = (
     enabled                  => "",
-    disabled                 => "",    
+    disabled                 => "",
     enableSmartButton        => "true,false",
-    authorizationRequired    => "true,false",    
+    authorizationRequired    => "true,false",
     startCharging            => "",
     stopCharging             => "",
     pauseCharging            => "",
@@ -135,7 +137,6 @@ my %sets = (
     deactivateTimer          => "",
 );
 
-
 ## Datapoint, all behind API URI
 my %dpoints = (
     getOAuthToken             => 'accounts/login',
@@ -153,17 +154,19 @@ my %dpoints = (
     getCurrentSession         => 'chargers/#ChargerID#/sessions/ongoing',
     setCableLockState         => 'chargers/#ChargerID#/commands/lock_state',
     setReboot                 => 'chargers/#ChargerID#/commands/reboot',
-    setUpdateFirmware         => 'chargers/#ChargerID#/commands/update_firmware',
-    setEnableSmartCharging    => 'chargers/#ChargerID#/commands/smart_charging',
-    setStartCharging          => 'chargers/#ChargerID#/commands/start_charging',
-    setStopCharging           => 'chargers/#ChargerID#/commands/stop_charging',
-    setPauseCharging          => 'chargers/#ChargerID#/commands/pause_charging',
-    setResumeCharging         => 'chargers/#ChargerID#/commands/resume_charging',
-    setToggleCharging         => 'chargers/#ChargerID#/commands/toggle_charging',
-    setOverrideChargingSchedule =>     'chargers/#ChargerID#/commands/override_schedule',
-    setPairRFIDTag             => 'chargers/#ChargerID#/commands/set_rfid_pairing_mode_async',
-    changeChargerSettings      => 'chargers/#ChargerID#/settings',
-    setChargingPrice           => 'sites/#SiteID#/price',
+    setUpdateFirmware      => 'chargers/#ChargerID#/commands/update_firmware',
+    setEnableSmartCharging => 'chargers/#ChargerID#/commands/smart_charging',
+    setStartCharging       => 'chargers/#ChargerID#/commands/start_charging',
+    setStopCharging        => 'chargers/#ChargerID#/commands/stop_charging',
+    setPauseCharging       => 'chargers/#ChargerID#/commands/pause_charging',
+    setResumeCharging      => 'chargers/#ChargerID#/commands/resume_charging',
+    setToggleCharging      => 'chargers/#ChargerID#/commands/toggle_charging',
+    setOverrideChargingSchedule =>
+      'chargers/#ChargerID#/commands/override_schedule',
+    setPairRFIDTag =>
+      'chargers/#ChargerID#/commands/set_rfid_pairing_mode_async',
+    changeChargerSettings => 'chargers/#ChargerID#/settings',
+    setChargingPrice      => 'sites/#SiteID#/price',
 );
 my %reasonsForNoCurrent = (
     0 => 'OK',                               #charger is allocated current
@@ -174,8 +177,8 @@ my %reasonsForNoCurrent = (
     5 => 'WaitingInQueue',
     6 => 'WaitingInFully'
     , #charged queue (charger assumes one of: EV uses delayed charging, EV charging complete)
-    7   => 'IllegalGridType',
-    8   => 'PrimaryUnitHasNotReceivedCurrentRequestFromSecondaryUnit',
+    7 => 'IllegalGridType',
+    8 => 'PrimaryUnitHasNotReceivedCurrentRequestFromSecondaryUnit',
     50  => 'SecondaryUnitNotRequestingCurrent',    #no car connected...
     51  => 'MaxChargerCurrentTooLow',
     52  => 'MaxDynamicChargerCurrentTooLow',
@@ -201,31 +204,30 @@ my %operationModes = (
 );
 
 my %commandCodes = (
-  1 => "Reboot",
-  2 => "Poll single observation",
-  3 => "Poll all observations",
-  4 => "Upgrade Firmware",
-  5 => "Download settings",
-  7 => "Scan Wifi",
-  11 => "Set smart charging",
-  23 => "Abort charging",
-  25 => "Start Charging",
-  26 => "Stop Charging",
-  29 => "Set enabled",
-  30 => "Set cable lock",
-  11 => "Set smart charging",
-  40 => "Set lightstripe brightness",
-  43 => "Add keys",
-  44 => "Clear keys",
-  48 => "Pause/Resume/Toggle Charging",
-  60 => "Add schedule",
-  61 => "Cear Schedule",
-  62 => "Get Schedule",
-  63 => "Override Schedule",
-  64 => "Purge Schedule",
-  69 => "Set RFID Pairing Mode",  
+    1  => "Reboot",
+    2  => "Poll single observation",
+    3  => "Poll all observations",
+    4  => "Upgrade Firmware",
+    5  => "Download settings",
+    7  => "Scan Wifi",
+    11 => "Set smart charging",
+    23 => "Abort charging",
+    25 => "Start Charging",
+    26 => "Stop Charging",
+    29 => "Set enabled",
+    30 => "Set cable lock",
+    11 => "Set smart charging",
+    40 => "Set lightstripe brightness",
+    43 => "Add keys",
+    44 => "Clear keys",
+    48 => "Pause/Resume/Toggle Charging",
+    60 => "Add schedule",
+    61 => "Cear Schedule",
+    62 => "Get Schedule",
+    63 => "Override Schedule",
+    64 => "Purge Schedule",
+    69 => "Set RFID Pairing Mode",
 );
-
 
 #Private function to evaluate command-lists
 # private funktionen beginnen immer mit _
@@ -238,14 +240,16 @@ sub _GetCmdList {
     my $name     = $hash->{NAME};
 
     #return, if cmd is valid
-    return undef if ( defined($cmd) and defined( $cmdArray{$cmd} ) );
+    return if ( defined($cmd) and defined( $cmdArray{$cmd} ) );
 
     #response for gui or the user, if command is invalid
     my $retVal;
     foreach my $mySet ( keys %cmdArray ) {
 
         #append set-command
-        $retVal = $retVal . " " if ( defined($retVal) );
+        $retVal = $retVal . " "
+          if ( defined($retVal) )
+          ; # Macht denke ich keinen Sinn da durch my $retVal bereits $retVal definiert ist
         $retVal = $retVal . $mySet;
 
         #get options
@@ -253,18 +257,21 @@ sub _GetCmdList {
 
         #append option, if valid
         $retVal = $retVal . ":" . $myOpt
-            if ( defined($myOpt) and ( length($myOpt) > 0 ) );
+          if ( defined($myOpt) and ( length($myOpt) > 0 ) );
         $myOpt = "" if ( !defined($myOpt) );
 
-        #Log3 ($name, 5, "parse cmd-table - Set:$mySet, Option:$myOpt, RetVal:$retVal");
+#Log3 ($name, 5, "parse cmd-table - Set:$mySet, Option:$myOpt, RetVal:$retVal");
     }
     if ( !defined($retVal) ) {
-        $retVal = "error while parsing set-table";
+        return "error while parsing set-table";
     }
-    else {
-        $retVal = "Unknown argument $cmd, choose one of " . $retVal;
-    }
-    return $retVal;
+
+    return "Unknown argument $cmd, choose one of " . $retVal;
+
+    # versuche wo wenig wie möglich if else zu verwenden.
+    # else {
+    #     $retVal = "Unknown argument $cmd, choose one of " . $retVal;
+    # }
 }
 
 sub Initialize {
@@ -285,7 +292,7 @@ sub Initialize {
       . $readingFnAttributes;
 
     #Log3, 'EaseeWallbox', 3, "EaseeWallbox module initialized.";
-    return;  
+    return;
 }
 
 sub Define {
@@ -300,22 +307,23 @@ sub Define {
 
     my $errmsg = '';
 
-    # Check parameter(s) - Must be min 4 in total (counts strings not purly parameter, interval is optional)
+# Check parameter(s) - Must be min 4 in total (counts strings not purly parameter, interval is optional)
     if ( int(@param) < 4 ) {
         $errmsg = return
-            "syntax error: define <name> EaseeWallbox <username> <password> [Interval]";
+"syntax error: define <name> EaseeWallbox <username> <password> [Interval]";
         Log3 $name, 1, "EaseeWallbox $name: " . $errmsg;
         return $errmsg;
     }
 
     #Check if the username is an email address
-    if ( $param[2] =~ /^.+@.+$/ ) {
+    if ( $param[2] =~ /^.+@.+$/x )
+    { # Regular expression without "/x" flag. See page 236 of PBP (RegularExpressions::RequireExtendedFormatting)
         my $username = $param[2];
         $hash->{Username} = $username;
     }
     else {
-        $errmsg
-            = "specify valid email address within the field username. Format: define <name> EaseeWallbox <username> <password> [interval]";
+        $errmsg =
+"specify valid email address within the field username. Format: define <name> EaseeWallbox <username> <password> [interval]";
         Log3 $name, 1, "EaseeWallbox $name: " . $errmsg;
         return $errmsg;
     }
@@ -342,12 +350,13 @@ sub Define {
     #If not an integer abort with failure.
     my $interval = 60;
     if ( defined $param[4] ) {
-        if ( $param[4] =~ /^\d+$/ ) {
+        if ( $param[4] =~ /^\d+$/x )
+        { # Regular expression without "/x" flag. See page 236 of PBP (RegularExpressions::RequireExtendedFormatting)
             $interval = $param[4];
         }
         else {
-            $errmsg
-                = "Specify valid integer value for interval. Whole numbers > 5 only. Format: define <name> EaseeWallbox <username> <password> [interval]";
+            $errmsg =
+"Specify valid integer value for interval. Whole numbers > 5 only. Format: define <name> EaseeWallbox <username> <password> [interval]";
             Log3 $name, 1, "EaseeWallbox $name: " . $errmsg;
             return $errmsg;
         }
@@ -359,25 +368,31 @@ sub Define {
     readingsSingleUpdate( $hash, 'state', 'Undefined', 0 );
 
     #Initial load of data
-    WriteToCloudAPI($hash, 'getChargers', 'GET');
+    WriteToCloudAPI( $hash, 'getChargers', 'GET' );
 
-    Log3 $name, 1, sprintf("EaseeWallbox_Define %s: Starting timer with interval %s", $name, InternalVal($name,'INTERVAL', undef));
-    InternalTimer(gettimeofday()+ InternalVal($name,'INTERVAL', undef), "FHEM::EaseeWallbox::UpdateDueToTimer", $hash) if (defined $hash);
-    return undef;
+    Log3 $name, 1,
+      sprintf( "EaseeWallbox_Define %s: Starting timer with interval %s",
+        $name, InternalVal( $name, 'INTERVAL', undef ) );
+    InternalTimer( gettimeofday() + InternalVal( $name, 'INTERVAL', undef ),
+        "FHEM::EaseeWallbox::UpdateDueToTimer", $hash )
+      if ( defined $hash );
+
+    ## return; sollte es nicht geben, ein return; ist per see mit Rückgabe undef
+    return;
 }
 
 sub Undef {
     my ( $hash, $arg ) = @_;
 
     RemoveInternalTimer($hash);
-    return undef;
+    return;
 }
 
 sub Get {
     my ( $hash, $name, @args ) = @_;
 
     return '"get EaseeWallbox" needs at least one argument'
-        if ( int(@args) < 1 );
+      if ( int(@args) < 1 );
 
     my $opt = shift @args;
 
@@ -386,10 +401,10 @@ sub Get {
     return $cmdTemp if ( defined($cmdTemp) );
 
     $hash->{LOCAL} = 1;
-    WriteToCloudAPI($hash, 'getChargers', 'GET')         if $opt eq "charger";
-    RefreshData($hash)                                   if $opt eq "update";      
+    WriteToCloudAPI( $hash, 'getChargers', 'GET' ) if $opt eq "charger";
+    RefreshData($hash)                             if $opt eq "update";
     delete $hash->{LOCAL};
-    return undef;  
+    return;
 }
 
 sub Set {
@@ -397,31 +412,40 @@ sub Set {
 
     return '"set $name" needs at least one argument' if ( int(@param) < 1 );
 
-    my $opt   = shift @param;
+    my $opt = shift @param;
     my $value = join( "", @param );
+    my %message;
 
     #create response, if cmd is wrong or gui asks
     my $cmdTemp = _GetCmdList( $hash, $opt, \%sets );
     return $cmdTemp if ( defined($cmdTemp) );
 
     if ( $opt eq "deactivateTimer" ) {
+
+# Cascading if-elsif chain. See pages 117,118 of PBP (ControlStructures::ProhibitCascadingIfElse) kann man anders machen. Später machen wir das
         RemoveInternalTimer($hash);
         Log3 $name, 1,
-            "EaseeWallbox_Set $name: Stopped the timer to automatically update readings";
+"EaseeWallbox_Set $name: Stopped the timer to automatically update readings";
         readingsSingleUpdate( $hash, 'state', 'Initialized', 0 );
-        return undef;
+        return;
     }
-     elsif ( $opt eq "activateTimer" ) {
+    elsif ( $opt eq "activateTimer" ) {
+
         #Update once manually and then start the timer
         RemoveInternalTimer($hash);
         $hash->{LOCAL} = 1;
         RefreshData($hash);
-        delete $hash->{LOCAL};      
-        InternalTimer(gettimeofday()+ InternalVal($name,'INTERVAL', undef), "FHEM::EaseeWallbox::UpdateDueToTimer", $hash);
-        readingsSingleUpdate($hash,'state','Started',0);  
-        Log3 $name, 1, sprintf("EaseeWallbox_Set %s: Updated readings and started timer to automatically update readings with interval %s", $name, InternalVal($name,'INTERVAL', undef));
+        delete $hash->{LOCAL};
+        InternalTimer( gettimeofday() + InternalVal( $name, 'INTERVAL', undef ),
+            "FHEM::EaseeWallbox::UpdateDueToTimer", $hash );
+        readingsSingleUpdate( $hash, 'state', 'Started', 0 );
+        Log3 $name, 1,
+          sprintf(
+"EaseeWallbox_Set %s: Updated readings and started timer to automatically update readings with interval %s",
+            $name, InternalVal( $name, 'INTERVAL', undef ) );
     }
-    elsif ( $opt eq "interval" ) {
+    elsif ( $opt eq "interval" )
+    { # interval wird immer über Attribut gesetzt. Also in die Funktion AttrFn aus Initialize
         my $interval = shift @param;
 
         $interval = 60 unless defined($interval);
@@ -430,103 +454,117 @@ sub Set {
         Log3 $name, 1, "EaseeWallbox_Set $name: Set interval to" . $interval;
         $hash->{INTERVAL} = $interval;
     }
-     elsif ( $opt eq "cableLock" ) {
-        my %message;
+    elsif ( $opt eq "cableLock" ) {
+
         $message{'state'} = $value;
-        WriteToCloudAPI($hash, 'setCableLockState', 'POST', \%message)
-    } 
+        WriteToCloudAPI( $hash, 'setCableLockState', 'POST', \%message );
+    }
     elsif ( $opt eq "pricePerKWH" ) {
-         my %message;
+
         $message{'currencyId'} = "EUR";
         $message{'vat'}        = "19";
         $message{'costPerKWh'} = shift @param;
-        WriteToCloudAPI($hash, 'setChargingPrice', 'POST', \%message)
-    } 
+        WriteToCloudAPI( $hash, 'setChargingPrice', 'POST', \%message );
+    }
     elsif ( $opt eq "pairRfidTag" ) {
         my $timeout = shift @param;
-        #if (defined $timeout and /^\d+$/)         { print "is a whole number\n" }
-        $timeout = '60'             if not defined $timeout or $timeout = '';
-         my %message;
+
+      #if (defined $timeout and /^\d+$/)         { print "is a whole number\n" }
+        $timeout = '60' if not defined $timeout or $timeout = '';
+
         $message{'timeout'} = "60";
-        WriteToCloudAPI($hash, 'setPairRFIDTag', 'POST', \%message)
-    } 
+        WriteToCloudAPI( $hash, 'setPairRFIDTag', 'POST', \%message );
+    }
     elsif ( $opt eq "enableSmartCharging" ) {
-         my %message;
+
         $message{'smartCharging'} = shift @param;
-        WriteToCloudAPI($hash, 'changeChargerSettings', 'POST', \%message)
-    } 
+        WriteToCloudAPI( $hash, 'changeChargerSettings', 'POST', \%message );
+    }
     elsif ( $opt eq "enabled" ) {
-         my %message;
+
         $message{'enabled'} = "true";
-        WriteToCloudAPI($hash, 'changeChargerSettings', 'POST', \%message)
-    } 
+        WriteToCloudAPI( $hash, 'changeChargerSettings', 'POST', \%message );
+    }
     elsif ( $opt eq "disabled" ) {
-         my %message;
+
         $message{'enabled'} = "false";
-        WriteToCloudAPI($hash, 'changeChargerSettings', 'POST', \%message)
-    } 
+        WriteToCloudAPI( $hash, 'changeChargerSettings', 'POST', \%message );
+    }
     elsif ( $opt eq "authorizationRequired" ) {
-         my %message;
+
         $message{'authorizationRequired'} = shift @param;
-        WriteToCloudAPI($hash, 'changeChargerSettings', 'POST', \%message)
-    } 
+        WriteToCloudAPI( $hash, 'changeChargerSettings', 'POST', \%message );
+    }
     elsif ( $opt eq "enableSmartButton" ) {
-         my %message;
+
         $message{'smartButtonEnabled'} = shift @param;
-        WriteToCloudAPI($hash, 'changeChargerSettings', 'POST', \%message)
-    } 
+        WriteToCloudAPI( $hash, 'changeChargerSettings', 'POST', \%message );
+    }
     elsif ( $opt eq "ledStripBrightness" ) {
-         my %message;
+
         $message{'ledStripBrightness'} = shift @param;
-        WriteToCloudAPI($hash, 'changeChargerSettings', 'POST', \%message)
-    } 
-    else 
-    {
-        $hash->{LOCAL} = 1;     
-        WriteToCloudAPI($hash, 'setStartCharging', 'POST')         if $opt eq "startCharging";
-        WriteToCloudAPI($hash, 'setStopCharging', 'POST')          if $opt eq 'stopCharging';  
-        WriteToCloudAPI($hash, 'setPauseCharging', 'POST')         if $opt eq 'pauseCharging';
-        WriteToCloudAPI($hash, 'setResumeCharging', 'POST')        if $opt eq 'resumeCharging';
-        WriteToCloudAPI($hash, 'setToggleCharging', 'POST')        if $opt eq 'toggleCharging';      
-        WriteToCloudAPI($hash, 'setUpdateFirmware', 'POST')        if $opt eq 'updateFirmware';
-        WriteToCloudAPI($hash, 'setOverrideChargingSchedule', 'POST')        if $opt eq 'overrideChargingSchedule';    
-        WriteToCloudAPI($hash, 'setReboot', 'POST')                                   if $opt eq 'reboot';
-        _loadToken($hash)                                                            if $opt eq 'refreshToken';   
+        WriteToCloudAPI( $hash, 'changeChargerSettings', 'POST', \%message );
+    }
+    else {
+        $hash->{LOCAL} = 1;
+        WriteToCloudAPI( $hash, 'setStartCharging', 'POST' )
+          if $opt eq "startCharging";
+        WriteToCloudAPI( $hash, 'setStopCharging', 'POST' )
+          if $opt eq 'stopCharging';
+        WriteToCloudAPI( $hash, 'setPauseCharging', 'POST' )
+          if $opt eq 'pauseCharging';
+        WriteToCloudAPI( $hash, 'setResumeCharging', 'POST' )
+          if $opt eq 'resumeCharging';
+        WriteToCloudAPI( $hash, 'setToggleCharging', 'POST' )
+          if $opt eq 'toggleCharging';
+        WriteToCloudAPI( $hash, 'setUpdateFirmware', 'POST' )
+          if $opt eq 'updateFirmware';
+        WriteToCloudAPI( $hash, 'setOverrideChargingSchedule', 'POST' )
+          if $opt eq 'overrideChargingSchedule';
+        WriteToCloudAPI( $hash, 'setReboot', 'POST' ) if $opt eq 'reboot';
+        _loadToken($hash)                             if $opt eq 'refreshToken';
         delete $hash->{LOCAL};
     }
-    readingsSingleUpdate( $hash, 'state', 'Initialized', 0 );
-    return undef;
+    readingsSingleUpdate( $hash, 'state', 'Initialized', 0 )
+      ; # Die Modulinstanz ist doch nicht erst bei einem set Initialized, das ist doch schon nach dem define. Wenn dann ist hier ein status ala "processing setter" oder so.
+    return;
 }
 
 sub Attr {
     my ( $cmd, $name, $attrName, $attrVal ) = @_;
+
+    # hier kannst Du das setzen des Intervals umsetzen
     return;
 }
 
-sub RefreshData{
-    my $hash     = shift;    
-    my $name     = $hash->{NAME};
-    WriteToCloudAPI($hash, 'getChargerSite', 'GET');
-    WriteToCloudAPI($hash, 'getChargerState', 'GET');
-    WriteToCloudAPI($hash, 'getCurrentSession', 'GET');
-    WriteToCloudAPI($hash, 'getChargerConfiguration', 'GET');
-    WriteToCloudAPI($hash, 'getChargerSessionsMonthly', 'GET');
-    WriteToCloudAPI($hash, 'getChargerSessionsDaily', 'GET');        
+sub RefreshData {
+    my $hash = shift;
+    my $name = $hash->{NAME};
+    WriteToCloudAPI( $hash, 'getChargerSite',            'GET' );
+    WriteToCloudAPI( $hash, 'getChargerState',           'GET' );
+    WriteToCloudAPI( $hash, 'getCurrentSession',         'GET' );
+    WriteToCloudAPI( $hash, 'getChargerConfiguration',   'GET' );
+    WriteToCloudAPI( $hash, 'getChargerSessionsMonthly', 'GET' );
+    WriteToCloudAPI( $hash, 'getChargerSessionsDaily',   'GET' );
+
+    return;    # immer mit einem return eine funktion beenden
 }
 
-sub UpdateDueToTimer($) {
+sub UpdateDueToTimer {
     my ($hash) = @_;
     my $name = $hash->{NAME};
 
-    #local allows call of function without adding new timer.
-    #must be set before call ($hash->{LOCAL} = 1) and removed after (delete $hash->{LOCAL};)
+#local allows call of function without adding new timer.
+#must be set before call ($hash->{LOCAL} = 1) and removed after (delete $hash->{LOCAL};)
     if ( !$hash->{LOCAL} ) {
         RemoveInternalTimer($hash);
+
         #Log3 "Test", 1, Dumper($hash);
-        InternalTimer(
-            gettimeofday() + InternalVal( $name, 'INTERVAL', undef ), "FHEM::EaseeWallbox::UpdateDueToTimer", $hash );
+        InternalTimer( gettimeofday() + InternalVal( $name, 'INTERVAL', undef ),
+            "FHEM::EaseeWallbox::UpdateDueToTimer", $hash );
     }
-    RefreshData($hash);
+
+    return RefreshData($hash);
 }
 
 sub WriteToCloudAPI {
