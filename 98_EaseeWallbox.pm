@@ -231,14 +231,13 @@ sub _GetCmdList {
 
     my %cmdArray = %$commands;
     my $name     = $hash->{NAME};
+    my $retVal;
 
     #return, if cmd is valid
     return if ( defined($cmd) and defined( $cmdArray{$cmd} ) );
 
     #response for gui or the user, if command is invalid
-    my $retVal;
     foreach my $mySet ( keys %cmdArray ) {
-
         #append set-command
         $retVal = $retVal . " "
           if ( defined($retVal) )
@@ -284,11 +283,12 @@ sub Define {
     my ( $hash, $def ) = @_;
     my @param = split( "[ \t]+", $def );
     my $name  = $hash->{NAME};
+    my $errmsg = '';
 
     # set API URI as Internal Key
     $hash->{APIURI} = 'https://api.easee.cloud/api/';
     Log3 $name, 3, "EaseeWallbox_Define $name: called ";
-    my $errmsg = '';
+
 
     # Check parameter(s) - Must be min 4 in total (counts strings not purly parameter, interval is optional)
     if ( int(@param) < 4 ) {
@@ -314,7 +314,6 @@ sub Define {
     #Take password and use custom encryption.
     # Encryption is taken from fitbit / withings module
     my $password = _encrypt( $param[3] );
-
     $hash->{Password} = $password;
 
     if ( defined $param[4] ) {
@@ -365,7 +364,6 @@ sub Define {
 
 sub Undef {
     my ( $hash, $arg ) = @_;
-
     RemoveInternalTimer($hash);
     return;
 }
@@ -567,13 +565,15 @@ sub WriteToCloudAPI {
     my $message = shift;
     my $name    = $hash->{NAME};
     my $url     = $hash->{APIURI} . $dpoints{$dpoint};
+    my $chargerId;
+    my $siteId;
+    my $payload;
 
     #########
     # CHANGE THIS
-    my $payload;
+     my $deviceId = "WC1";
     $payload = encode_json \%$message if defined $message;
-    my $deviceId = "WC1";
-
+   
     if ( not defined $hash ) {
         my $msg =
           "Error on EaseeWallbox_WriteToCloudAPI. Missing hash variable";
@@ -584,7 +584,7 @@ sub WriteToCloudAPI {
     #Check if chargerID is required in URL and replace or alert.
     if ( $url =~ m/\#ChargerID\#/x )
     { # Regular expression without "/x" flag. See page 236 of PBP (RegularExpressions::RequireExtendedFormatting)
-        my $chargerId = ReadingsVal( $name, 'charger_id', undef );
+        $chargerId = ReadingsVal( $name, 'charger_id', undef );
         if ( not defined $chargerId ) {
             my $error =
 "Error on EaseeWallbox_WriteToCloudAPI. Missing charger_id. Please ensure basic data is available.";
@@ -598,7 +598,7 @@ sub WriteToCloudAPI {
     #Check if siteID is required in URL and replace or alert.
     if ( $url =~ m/\#SiteID\#/x )
     { # Regular expression without "/x" flag. See page 236 of PBP (RegularExpressions::RequireExtendedFormatting)
-        my $siteId = ReadingsVal( $name, 'site_id', undef );
+        $siteId = ReadingsVal( $name, 'site_id', undef );
         if ( not defined $siteId ) {
             my $error =
 "Error on EaseeWallbox_WriteToCloudAPI. Missing site_id. Please ensure basic data is available.";
@@ -642,6 +642,8 @@ sub ResponseHandling {
     my $data  = shift;
     my $hash  = $param->{hash};
     my $name  = $hash->{NAME};
+    my $decoded_json;
+    my $value;
 
     Log3 $name, 4, "Callback received." . $param->{url};
 
@@ -690,14 +692,12 @@ sub ResponseHandling {
     Log3 $name, 5, '$err: ' . $err;
     Log3 $name, 5, "method: " . $param->{method};
 
-    my $decoded_json;
     eval { $decoded_json = decode_json($data) }; # statt eval ist es empfohlen catch try zu verwenden. Machen wir später
     if ($@) {
         Log3 $name, 3, "EaseeWallbox ($name) - JSON error while processing request";
     }
 
     Log3 $name, 5, 'Decoded: ' . Dumper($decoded_json);
-    my $value;
     if (    defined $decoded_json
         and $decoded_json ne ''
         and ref($decoded_json) eq "HASH"
@@ -712,8 +712,6 @@ sub ResponseHandling {
             Processing_DpointGetChargerSessionsDaily( $hash, $decoded_json );
             return;
         }
-
-        # Und so weiter und so weiter mit den einzelnen Funktionen !!!
 
         if ( $param->{dpoint} eq 'getChargerSessionsMonthly' ) {
             Processing_DpointGetChargerSessionsMonthly( $hash, $decoded_json );
@@ -743,7 +741,7 @@ sub ResponseHandling {
         $decoded_json = $decoded_json->[0] if ref($decoded_json) eq "ARRAY";
         readingsSingleUpdate( $hash, "lastResponse",
             'OK - Action: ' . $commandCodes{ $decoded_json->{commandId} }, 1 )
-          if defined $decoded_json->{commandId};
+          if exists $decoded_json->{commandId};
         readingsSingleUpdate(
             $hash,
             "lastResponse",
@@ -752,7 +750,7 @@ sub ResponseHandling {
               . $decoded_json->{status} . ')',
             1
           )
-          if defined $decoded_json->{status} and defined $decoded_json->{title};
+          if exists $decoded_json->{status} and exists $decoded_json->{title};
         return;
     }
     else {
@@ -915,13 +913,13 @@ sub Processing_DpointGetChargerConfiguration {
 sub Processing_DpointGetCurrentSession {
     my $hash         = shift;
     my $decoded_json = shift;
-
     my $name = $hash->{NAME};
+    my $value;
 
     readingsBeginUpdate($hash);
     readingsBulkUpdate( $hash, "session_energy",
         sprintf( "%.2f", $decoded_json->{sessionEnergy} ) );
-    my $value =
+    $value =
       defined $decoded_json->{sessionStart}
       ? _transcodeDate( $decoded_json->{sessionStart} )
       : 'N/A';
@@ -972,7 +970,6 @@ sub Processing_DpointGetChargerSite {
     readingsBulkUpdate( $hash, "cost_vat", $decoded_json->{vat} );
     readingsBulkUpdate( $hash, "cost_currency",
         $decoded_json->{currencyId} );
-
     #readingsBulkUpdate( $hash, "site_ratedCurrent", $decoded_json->{ratedCurrent} );
     #readingsBulkUpdate( $hash, "site_createdOn",    $decoded_json->{createdOn} );
     #readingsBulkUpdate( $hash, "site_updatedOn",    $decoded_json->{updatedOn} );
@@ -989,9 +986,9 @@ sub Processing_DpointGetChargers {
     my $site    = $decoded_json->[0];
     my $circuit = $site->{circuits}->[0];
     my $charger = $circuit->{chargers}->[0];
+    my $chargerId = $charger->{id};
 
     readingsBeginUpdate($hash);
-    my $chargerId = $charger->{id};
     readingsBulkUpdate( $hash, "site_id",      $site->{id} );
     readingsBulkUpdate( $hash, "site_key",     $site->{siteKey} );
     readingsBulkUpdate( $hash, "charger_id",   $chargerId );
@@ -1000,20 +997,16 @@ sub Processing_DpointGetChargers {
     readingsEndUpdate( $hash, 1 );
 
     WriteToCloudAPI( $hash, 'getChargerConfiguration', 'GET' );
-
     return;
 }
 
 sub Processing_DpointGetChargerSessionsDaily {
     my $hash         = shift;
     my $decoded_json = shift;
-
     my $name = $hash->{NAME};
+    my @a = ( -5 .. -1 );
 
     Log3 $name, 5, 'Evaluating getChargerSessionsDaily';
-
-    my @x = $decoded_json;
-    my @a = ( -5 .. -1 );
 
     readingsBeginUpdate($hash);
     for (@a) {
@@ -1029,22 +1022,17 @@ sub Processing_DpointGetChargerSessionsDaily {
             sprintf( "%.2f", $decoded_json->[$_]->{'totalCost'} )
         );
     }
-
     readingsEndUpdate( $hash, 1 );
-
     return;
 }
 
 sub Processing_DpointGetChargerSessionsMonthly {
     my $hash         = shift;
     my $decoded_json = shift;
-
     my $name = $hash->{NAME};
+    my @a = ( -6 .. -1 );
 
     Log3 $name, 4, 'Evaluating getChargerSessionsMonthly';
-    
-    my @x = $decoded_json;
-    my @a = ( -6 .. -1 );
 
     readingsBeginUpdate($hash);
     for (@a) {
