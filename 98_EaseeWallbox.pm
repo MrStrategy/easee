@@ -1109,7 +1109,7 @@ sub _newTokenRequest {
         url     => $hash->{APIURI} . $dpoints{getOAuthToken},
         header  => { "Content-Type" => "application/json" },
         method  => 'POST',
-        timeout => 5,
+        timeout => 3,
         hash    => $hash,
         data    => encode_json $data
     };
@@ -1174,7 +1174,7 @@ sub _tokenRefresh {
         url     => $hash->{APIURI} . $dpoints{getRefreshToken},
         header  => { "Content-Type" => "application/json" },
         method  => 'POST',
-        timeout => 5,
+        timeout => 3,
         hash    => $hash,
         data    => encode_json $data
     };
