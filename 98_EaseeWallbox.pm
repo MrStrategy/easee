@@ -294,7 +294,7 @@ sub Define {
     # Check parameter(s) - Must be min 4 in total (counts strings not purly parameter, interval is optional)
     if ( int(@param) < 4 ) {
         $errmsg = return
-                "syntax error: define <name> EaseeWallbox <username> <password> [Interval]";
+                "syntax error: define <name> EaseeWallbox <username> <password> [interval] [chargerID]";
         Log3 $name, 1, "EaseeWallbox $name: " . $errmsg;
         return $errmsg;
     }
@@ -307,7 +307,7 @@ sub Define {
     }
     else {
         $errmsg =
-            "specify valid email address within the field username. Format: define <name> EaseeWallbox <username> <password> [interval]";
+            "specify valid email address within the field username. Format: define <name> EaseeWallbox <username> <password> [interval]  [chargerID]";
         Log3 $name, 1, "EaseeWallbox $name: " . $errmsg;
         return $errmsg;
     }
@@ -339,7 +339,7 @@ sub Define {
         }
         else {
             $errmsg =
-"Specify valid integer value for interval. Whole numbers > 5 only. Format: define <name> EaseeWallbox <username> <password> [interval]";
+"Specify valid integer value for interval. Whole numbers > 5 only. Format: define <name> EaseeWallbox <username> <password> [interval]  [chargerID]";
             Log3 $name, 1, "EaseeWallbox $name: " . $errmsg;
             return $errmsg;
         }
@@ -347,6 +347,8 @@ sub Define {
 
     if ( $interval < 5 ) { $interval = 5; }
     $hash->{INTERVAL} = $interval;
+
+    $hash->{FIXED_CHARGER_ID} = $param[5] if defined $param[5];    
 
     readingsSingleUpdate( $hash, 'state', 'Undefined', 0 );
 
@@ -584,8 +586,10 @@ sub WriteToCloudAPI {
 
     #Check if chargerID is required in URL and replace or alert.
     if ( $url =~ m/\#ChargerID\#/x )
-    { # Regular expression without "/x" flag. See page 236 of PBP (RegularExpressions::RequireExtendedFormatting)
-        $chargerId = ReadingsVal( $name, 'charger_id', undef );
+    { 
+        #If defined, prefer the fixed charger id over the reading.
+        $chargerId = InternalVal( $name, 'FIXED_CHARGER_ID', undef );
+        $chargerId = ReadingsVal( $name, 'charger_id', undef )      if not defined $chargerId;
         if ( not defined $chargerId ) {
             my $error =
 "Error on EaseeWallbox_WriteToCloudAPI. Missing charger_id. Please ensure basic data is available.";
@@ -983,10 +987,27 @@ sub Processing_DpointGetChargerSite {
 sub Processing_DpointGetChargers {
     my $hash         = shift;
     my $decoded_json = shift;
+    my $name         = $hash->{NAME};
+    my $index;
 
     my $site    = $decoded_json->[0];
     my $circuit = $site->{circuits}->[0];
-    my $charger = $circuit->{chargers}->[0];
+    
+    #If a fixed charger is selected, find the charger data
+    my $fixedChargerId = InternalVal( $name, 'FIXED_CHARGER_ID', undef );
+    if (defined $fixedChargerId) {
+        my @chargerList = @{$circuit->{chargers}};
+        for my $i (0 .. $#chargerList) {
+            $index = $i     if $chargerList[$i]->{id} eq $fixedChargerId;  
+            Log3 $name, 5, "Compared  ". $chargerList[$i]->{id} . " and ". $fixedChargerId;
+        }
+    } else {
+        $index = 0;
+        Log3 $name, 5, "No fixed charger ID, using first charger as default."
+    }
+
+    my $charger = $circuit->{chargers}->[$index];
+
     my $chargerId = $charger->{id};
 
     readingsBeginUpdate($hash);
