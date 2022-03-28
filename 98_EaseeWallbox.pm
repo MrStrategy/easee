@@ -240,14 +240,14 @@ sub _GetCmdList {
     #response for gui or the user, if command is invalid
     foreach my $mySet ( keys %cmdArray ) {
         #append set-command
-        $retVal = $retVal . " "
-          if ( defined($retVal) )
-          ; # Macht denke ich keinen Sinn da durch my $retVal bereits $retVal definiert ist
-        $retVal = $retVal . $mySet;
+        if (defined $retVal){
+            $retVal = $retVal . " " . $mySet;
+        } else {
+            $retVal = $mySet;
+        }
 
         #get options
         my $myOpt = $cmdArray{$mySet};
-
         #append option, if valid
         $retVal = $retVal . ":" . $myOpt
           if ( defined($myOpt) and ( length($myOpt) > 0 ) );
@@ -1026,7 +1026,6 @@ sub Processing_DpointGetChargerSessionsDaily {
     my $hash         = shift;
     my $decoded_json = shift;
     my $name = $hash->{NAME};
-    my @a = ( -7 .. -1 );
 
     Log3 $name, 5, 'Evaluating getChargerSessionsDaily';
 
@@ -1036,9 +1035,6 @@ sub Processing_DpointGetChargerSessionsDaily {
     my $elementCount = min(7,$arrayLength);
     my @a = ( ($elementCount * -1) .. -1 );
     Log3 $name, 5, "Taking historic data of last $elementCount days";
-
-
-
 
     readingsBeginUpdate($hash);
     for (@a) {
@@ -1330,7 +1326,13 @@ sub _transcodeDate {
 
 sub NumericToBoolean {
     my $number = shift;
-    return $number == 0 ? 'false' : 'true'; 
+
+    return      if not defined $number;
+
+    my $result;
+    eval {$result = $number == 0 ? 'false' : 'true'; };
+    return $result  if not $@;
+    return $number;
 }
 
 1;    # Ein Modul muss immer mit 1; enden
