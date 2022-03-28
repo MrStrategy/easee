@@ -9,6 +9,7 @@ use HttpUtils;
 use JSON;
 use DateTime;
 use DateTime::Format::Strptime;
+use List::Util qw(min);
 
 # try to use JSON::MaybeXS wrapper
 #   for chance of better performance + open code
@@ -1004,9 +1005,19 @@ sub Processing_DpointGetChargerSessionsDaily {
     my $hash         = shift;
     my $decoded_json = shift;
     my $name = $hash->{NAME};
-    my @a = ( -5 .. -1 );
+    my @a = ( -7 .. -1 );
 
     Log3 $name, 5, 'Evaluating getChargerSessionsDaily';
+
+    #If less than 7 days of data is available. take only available data
+    #otherwise take days
+    my $arrayLength = scalar @{$decoded_json} ;
+    my $elementCount = min(7,$arrayLength);
+    my @a = ( ($elementCount * -1) .. -1 );
+    Log3 $name, 5, "Taking historic data of last $elementCount days";
+
+
+
 
     readingsBeginUpdate($hash);
     for (@a) {
@@ -1030,9 +1041,16 @@ sub Processing_DpointGetChargerSessionsMonthly {
     my $hash         = shift;
     my $decoded_json = shift;
     my $name = $hash->{NAME};
-    my @a = ( -6 .. -1 );
 
     Log3 $name, 4, 'Evaluating getChargerSessionsMonthly';
+
+    #If less than 6 months of data is available. take only available data
+    #otherwise take 6 months
+    my $arrayLength = scalar @{$decoded_json} ;
+    my $elementCount = min(6,$arrayLength);
+    my @a = ( ($elementCount * -1) .. -1 );
+    Log3 $name, 5, "Taking historic data of last $elementCount months";
+
 
     readingsBeginUpdate($hash);
     for (@a) {
