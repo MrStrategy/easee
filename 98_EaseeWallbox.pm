@@ -348,7 +348,7 @@ sub Define {
     if ( $interval < 5 ) { $interval = 5; }
     $hash->{INTERVAL} = $interval;
 
-    $hash->{FIXED_CHARGER_ID} = $param[5] if defined $param[5];    
+    $hash->{FIXED_CHARGER_ID} = $param[5] if defined $param[5];
 
     readingsSingleUpdate( $hash, 'state', 'Undefined', 0 );
 
@@ -435,7 +435,7 @@ sub Set {
     elsif ( $opt eq "pricePerKWH" ) {
 
         $message{'currencyId'} = "EUR";
-        $message{'vat'}        = "19";
+        $message{'vat'}        =  19;
         $message{'costPerKWh'} = shift @param;
         WriteToCloudAPI( $hash, 'setChargingPrice', 'POST', \%message );
     }
@@ -512,10 +512,10 @@ sub Attr {
             return 'Interval must be greater than 0'
               if ( $attrVal == 0 );
             RemoveInternalTimer( $hash,
-                "FHEM::EaseeWallbox::UpdateDueToTimer" );                
+                "FHEM::EaseeWallbox::UpdateDueToTimer" );
             $hash->{INTERVAL} = $attrVal;
             InternalTimer( gettimeofday() + $hash->{INTERVAL},
-                "FHEM::EaseeWallbox::UpdateDueToTimer", $hash );               
+                "FHEM::EaseeWallbox::UpdateDueToTimer", $hash );
             Log3 $name, 3,
               "EaseeWallbox ($name) - set interval: $attrVal";
         }
@@ -524,7 +524,7 @@ sub Attr {
                 "FHEM::EaseeWallbox::UpdateDueToTimer" );
             $hash->{INTERVAL} = 60;
             InternalTimer( gettimeofday() + $hash->{INTERVAL},
-                "FHEM::EaseeWallbox::UpdateDueToTimer", $hash );              
+                "FHEM::EaseeWallbox::UpdateDueToTimer", $hash );
             Log3 $name, 3,
 "EaseeWallbox ($name) - delete interval and set default: 60";
         }
@@ -576,7 +576,7 @@ sub WriteToCloudAPI {
     # CHANGE THIS
      my $deviceId = "WC1";
     $payload = encode_json \%$message if defined $message;
-   
+
     if ( not defined $hash ) {
         my $msg =
           "Error on EaseeWallbox_WriteToCloudAPI. Missing hash variable";
@@ -586,7 +586,7 @@ sub WriteToCloudAPI {
 
     #Check if chargerID is required in URL and replace or alert.
     if ( $url =~ m/\#ChargerID\#/x )
-    { 
+    {
         #If defined, prefer the fixed charger id over the reading.
         $chargerId = InternalVal( $name, 'FIXED_CHARGER_ID', undef );
         $chargerId = ReadingsVal( $name, 'charger_id', undef )      if not defined $chargerId;
@@ -650,7 +650,7 @@ sub ResponseHandling {
     my $decoded_json;
     my $value;
 
-    Log3 $name, 4, "Callback received." . $param->{url};
+    Log3 $name, 4, "Callback received. " . $param->{url};
 
     if ( $err ne "" )    # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
     {
@@ -664,7 +664,7 @@ sub ResponseHandling {
 
     my $code = $param->{code};
     if ( $code == 404 and $param->{dpoint} eq 'getCurrentSession' )
-    {   
+    {
         readingsDelete( $hash, 'session_energy' );
         readingsDelete( $hash, 'session_start' );
         readingsDelete( $hash, 'session_end' );
@@ -690,19 +690,17 @@ sub ResponseHandling {
     Log3 $name, 4,
       "Received non-blocking data from EaseeWallbox.";
 
-    Log3 $name, 4, "FHEM -> EaseeWallbox: " . $param->{url};
-    Log3 $name, 4, "FHEM -> EaseeWallbox: " . $param->{message}
-      if ( defined $param->{message} );
-    Log3 $name, 4, "EaseeWallbox -> FHEM: " . $data;
-    Log3 $name, 5, '$err: ' . $err;
-    Log3 $name, 5, "method: " . $param->{method};
+    Log3 $name, 4, "FHEM -> EaseeWallbox (url): " . $param->{url};
+    Log3 $name, 5, "FHEM -> EaseeWallbox (method): " . $param->{method};
+    Log3 $name, 4, "FHEM -> EaseeWallbox (payload): " . (defined $param->{data} and $param->{data} ne '' ? $param->{data} : '<empty>');
+    Log3 $name, 4, "EaseeWallbox -> FHEM (resultCode): " . $code;
+    Log3 $name, 4, "EaseeWallbox -> FHEM (payload): " . (defined $data and $data ne '' ? $data : '<empty>');
+    Log3 $name, 5, 'EaseeWallbox -> FHEM (error): ' . (defined $err and $err ne '' ? $$err : '<empty>');
+
 
     eval { $decoded_json = decode_json($data) }; # statt eval ist es empfohlen catch try zu verwenden. Machen wir später
-    if ($@) {
-        Log3 $name, 3, "EaseeWallbox ($name) - JSON error while processing request";
-    }
 
-    Log3 $name, 5, 'Decoded: ' . Dumper($decoded_json);
+    Log3 $name, 5, 'Decoded Payload: ' . Dumper($decoded_json);
     if (    defined $decoded_json
         and $decoded_json ne ''
         and ref($decoded_json) eq "HASH"
@@ -725,22 +723,22 @@ sub ResponseHandling {
 
         if ( $param->{dpoint} eq 'getChargerConfiguration' ) {
             Processing_DpointGetChargerConfiguration( $hash, $decoded_json );
-            return;            
+            return;
         }
 
         if ( $param->{dpoint} eq 'getCurrentSession' ) {
             Processing_DpointGetCurrentSession( $hash, $decoded_json );
-            return; 
+            return;
         }
 
         if ( $param->{dpoint} eq 'getChargerSite' ) {
             Processing_DpointGetChargerSite( $hash, $decoded_json );
-            return; 
+            return;
         }
 
         if ( $param->{dpoint} eq 'getChargerState' ) {
             Processing_DpointGetChargerState( $hash, $decoded_json );
-            return; 
+            return;
         }
 
         $decoded_json = $decoded_json->[0] if ref($decoded_json) eq "ARRAY";
@@ -759,7 +757,7 @@ sub ResponseHandling {
         return;
     }
     else {
-        readingsSingleUpdate( $hash, "lastResponse", 'OK - empty', 1 );
+        readingsSingleUpdate( $hash, "lastResponse", 'OK - empty (' . $param->{dpoint} . ')', 1 );
         return;
     }
 
@@ -788,7 +786,7 @@ sub Processing_DpointGetCurrentSessionNotFound {
     readingsBulkUpdate( $hash, 'session_chargingCost', 'N/A' );
     readingsBulkUpdate( $hash, 'session_id', 'N/A' );
     readingsEndUpdate( $hash, 1 );
-    return;    
+    return;
 }
 
 
@@ -796,7 +794,7 @@ sub Processing_DpointGetChargerState {
     my $hash         = shift;
     my $decoded_json = shift;
 
-    my $name = $hash->{NAME}; 
+    my $name = $hash->{NAME};
 
     readingsBeginUpdate($hash);
     readingsBulkUpdate( $hash, "operationModeCode",
@@ -824,7 +822,7 @@ sub Processing_DpointGetChargerState {
         $decoded_json->{fatalErrorCode} );
     readingsBulkUpdate( $hash, "lifetimeEnergy",
         sprintf( "%.2f", $decoded_json->{lifetimeEnergy} ) );
-    readingsBulkUpdate( $hash, "online", 
+    readingsBulkUpdate( $hash, "online",
         NumericToBoolean($decoded_json->{isOnline} ));
     readingsBulkUpdate( $hash, "voltage",
         sprintf( "%.2f", $decoded_json->{voltage} ) );
@@ -835,7 +833,7 @@ sub Processing_DpointGetChargerState {
     readingsBulkUpdate( $hash, "lastResponse",
         'OK - getChargerState', 1 );
     readingsEndUpdate( $hash, 1 );
-    return;    
+    return;
 }
 
 sub Processing_DpointGetChargerConfiguration {
@@ -912,7 +910,7 @@ sub Processing_DpointGetChargerConfiguration {
     readingsBulkUpdate( $hash, "lastResponse",
         'OK - getChargerConfig', 1 );
     readingsEndUpdate( $hash, 1 );
-    return;    
+    return;
 }
 
 sub Processing_DpointGetCurrentSession {
@@ -959,7 +957,7 @@ sub Processing_DpointGetCurrentSession {
     readingsBulkUpdate( $hash, "lastResponse",
         'OK - getCurrentSession', 1 );
     readingsEndUpdate( $hash, 1 );
-    return;    
+    return;
 }
 
 sub Processing_DpointGetChargerSite {
@@ -981,7 +979,7 @@ sub Processing_DpointGetChargerSite {
     readingsBulkUpdate( $hash, "lastResponse",
         'OK - getChargerSite', 1 );
     readingsEndUpdate( $hash, 1 );
-    return;    
+    return;
 }
 
 sub Processing_DpointGetChargers {
@@ -992,13 +990,13 @@ sub Processing_DpointGetChargers {
 
     my $site    = $decoded_json->[0];
     my $circuit = $site->{circuits}->[0];
-    
+
     #If a fixed charger is selected, find the charger data
     my $fixedChargerId = InternalVal( $name, 'FIXED_CHARGER_ID', undef );
     if (defined $fixedChargerId) {
         my @chargerList = @{$circuit->{chargers}};
         for my $i (0 .. $#chargerList) {
-            $index = $i     if $chargerList[$i]->{id} eq $fixedChargerId;  
+            $index = $i     if $chargerList[$i]->{id} eq $fixedChargerId;
             Log3 $name, 5, "Compared  ". $chargerList[$i]->{id} . " and ". $fixedChargerId;
         }
     } else {
@@ -1316,7 +1314,7 @@ sub _transcodeDate {
     Log3 'EaseeWallbox', 5, 'date to parse: ' . $datestr;
     my $strp = DateTime::Format::Strptime->new(
         on_error => 'croak',
-        pattern  => '%Y-%m-%dT%H:%M:%S%z'
+        pattern  => '%Y-%m-%dT%H:%M:%S'
     );
     my $dt = $strp->parse_datetime($datestr);
     $dt->set_time_zone('Europe/Berlin');
