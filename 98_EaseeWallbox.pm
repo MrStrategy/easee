@@ -132,6 +132,7 @@ my %sets = (
     pricePerKWH              => "",
     activateTimer            => "",
     deactivateTimer          => "",
+    dynamicCurrent           => "",
 );
 
 ## Datapoint, all behind API URI
@@ -149,6 +150,7 @@ my %dpoints = (
     getChargerSessionsDaily   => 'sessions/charger/#ChargerID#/daily',
     getChargerState           => 'chargers/#ChargerID#/state',
     getCurrentSession         => 'chargers/#ChargerID#/sessions/ongoing',
+    getDynamicCurrent         => 'sites/#SiteID#/circuits/#CircuitId#/dynamicCurrent',
     setCableLockState         => 'chargers/#ChargerID#/commands/lock_state',
     setReboot                 => 'chargers/#ChargerID#/commands/reboot',
     setUpdateFirmware         => 'chargers/#ChargerID#/commands/update_firmware',
@@ -164,7 +166,9 @@ my %dpoints = (
       'chargers/#ChargerID#/commands/set_rfid_pairing_mode_async',
     changeChargerSettings => 'chargers/#ChargerID#/settings',
     setChargingPrice      => 'sites/#SiteID#/price',
+    setDynamicCurrent     => 'sites/#SiteID#/circuits/#CircuitId#/dynamicCurrent',
 );
+
 my %reasonsForNoCurrent = (
     0 => 'OK',                               #charger is allocated current
     1 => 'MaxCircuitCurrentTooLow',
@@ -478,6 +482,15 @@ sub Set {
         $message{'ledStripBrightness'} = shift @param;
         WriteToCloudAPI( $hash, 'changeChargerSettings', 'POST', \%message );
     }
+    elsif ( $opt eq "dynamicCurrent" ) {
+
+        $message{'phase1'} = shift @param;
+        $message{'phase2'} = shift @param;
+        $message{'phase3'} = shift @param;
+        my $ttl = shift @param;
+        $message{'timeToLive'} = ( defined $ttl and $ttl ne '' ? $ttl : 0);
+        WriteToCloudAPI( $hash, 'setDynamicCurrent', 'POST', \%message );
+    }
     else {
         $hash->{LOCAL} = 1;
         WriteToCloudAPI( $hash, 'setStartCharging', 'POST' )
@@ -542,6 +555,7 @@ sub RefreshData {
     WriteToCloudAPI( $hash, 'getChargerConfiguration',   'GET' );
     WriteToCloudAPI( $hash, 'getChargerSessionsMonthly', 'GET' );
     WriteToCloudAPI( $hash, 'getChargerSessionsDaily',   'GET' );
+    WriteToCloudAPI( $hash, 'getDynamicCurrent',         'GET' );
 
     return;    # immer mit einem return eine funktion beenden
 }
@@ -571,6 +585,7 @@ sub WriteToCloudAPI {
     my $chargerId;
     my $siteId;
     my $payload;
+    my $circuitId;
 
     #########
     # CHANGE THIS
@@ -613,6 +628,22 @@ sub WriteToCloudAPI {
         $url =~ s/\#SiteID\#/$siteId/xg
           ; # Regular expression without "/x" flag. See page 236 of PBP (RegularExpressions::RequireExtendedFormatting)
     }
+
+
+    #Check if CircuitId is required in URL and replace or alert.
+    if ( $url =~ m/\#CircuitId\#/x )
+    { # Regular expression without "/x" flag. See page 236 of PBP (RegularExpressions::RequireExtendedFormatting)
+        $circuitId = ReadingsVal( $name, 'circuit_id', undef );
+        if ( not defined $circuitId ) {
+            my $error =
+"Error on EaseeWallbox_WriteToCloudAPI. Missing circuit_id. Please ensure basic data is available.";
+            Log3 'EaseeWallbox', 1, $error;
+            return $error;
+        }
+        $url =~ s/\#CircuitId\#/$circuitId/xg
+          ; # Regular expression without "/x" flag. See page 236 of PBP (RegularExpressions::RequireExtendedFormatting)
+    }
+
 
     my $CurrentTokenData = _loadToken($hash);
     my $header           = {
@@ -740,6 +771,12 @@ sub ResponseHandling {
             Processing_DpointGetChargerState( $hash, $decoded_json );
             return;
         }
+
+        if ( $param->{dpoint} eq 'getDynamicCurrent' ) {
+            Processing_DpointGetDynamicCurrent( $hash, $decoded_json );
+            return;
+        }
+
 
         $decoded_json = $decoded_json->[0] if ref($decoded_json) eq "ARRAY";
         readingsSingleUpdate( $hash, "lastResponse",
@@ -973,6 +1010,9 @@ sub Processing_DpointGetChargerSite {
     readingsBulkUpdate( $hash, "cost_vat", $decoded_json->{vat} );
     readingsBulkUpdate( $hash, "cost_currency",
         $decoded_json->{currencyId} );
+    readingsBulkUpdate( $hash, "circuit_id",
+            $decoded_json->{circuits}->[0]->{id} );
+
     #readingsBulkUpdate( $hash, "site_ratedCurrent", $decoded_json->{ratedCurrent} );
     #readingsBulkUpdate( $hash, "site_createdOn",    $decoded_json->{createdOn} );
     #readingsBulkUpdate( $hash, "site_updatedOn",    $decoded_json->{updatedOn} );
@@ -981,6 +1021,30 @@ sub Processing_DpointGetChargerSite {
     readingsEndUpdate( $hash, 1 );
     return;
 }
+
+
+
+sub Processing_DpointGetDynamicCurrent {
+    my $hash         = shift;
+    my $decoded_json = shift;
+
+    my $name = $hash->{NAME};
+    readingsBeginUpdate($hash);
+
+    readingsBulkUpdate( $hash, "dynamicCurrent_phase1",
+        $decoded_json->{phase1} );
+    readingsBulkUpdate( $hash, "dynamicCurrent_phase2",
+        $decoded_json->{phase2} );
+    readingsBulkUpdate( $hash, "dynamicCurrent_phase3",
+        $decoded_json->{phase3} );
+
+    readingsBulkUpdate( $hash, "lastResponse",
+        'OK - getDynamicCurrent', 1 );
+    readingsEndUpdate( $hash, 1 );
+    return;
+}
+
+
 
 sub Processing_DpointGetChargers {
     my $hash         = shift;
