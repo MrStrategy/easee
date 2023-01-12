@@ -1091,6 +1091,32 @@ sub Processing_DpointGetChargerSessionsDaily {
 
     Log3 $name, 5, 'Evaluating getChargerSessionsDaily';
 
+
+   my $startDate = DateTime->now();
+   my $counter = 0;
+
+   readingsBeginUpdate($hash);
+   while( $counter <= 7 ) {
+
+     #Search in the returned data if it contains info for the specific day
+     my @matches = grep { $_->{'dayOfMonth'} == $startDate->day && $_->{'month'} == $startDate->month && $_->{'year'} == $startDate->year } @{$decoded_json};
+
+       readingsBulkUpdate(
+           $hash,
+           "daily_".($counter*-1)."_energy",
+           (scalar @matches == 1)? @matches[0]->{'totalEnergyUsage'} : 0
+       );
+       readingsBulkUpdate(
+           $hash,
+           "daily_".($counter*-1)."_cost",
+           (scalar @matches == 1)? @matches[0]->{'totalCost'} : 0
+       );
+
+       $startDate->add(days => -1);
+       $counter++;
+   }
+   readingsEndUpdate( $hash, 1 );
+
     #If less than 7 days of data is available. take only available data
     #otherwise take days
     my $arrayLength = scalar @{$decoded_json} ;
@@ -1103,13 +1129,18 @@ sub Processing_DpointGetChargerSessionsDaily {
         Log3 $name, 5, 'laeuft noch: ' . $_;
         readingsBulkUpdate(
             $hash,
-            "daily_" . ( $_ + 1 ) . "_energy",
+            "dailyHistory_" . ( $_ + 1 ) . "_energy",
             sprintf( "%.2f", $decoded_json->[$_]->{'totalEnergyUsage'} )
         );
         readingsBulkUpdate(
             $hash,
-            "daily_" . ( $_ + 1 ) . "_cost",
+            "dailyHistory_" . ( $_ + 1 ) . "_cost",
             sprintf( "%.2f", $decoded_json->[$_]->{'totalCost'} )
+        );
+        readingsBulkUpdate(
+            $hash,
+            "dailyHistory_" . ( $_ + 1 ) . "_date",
+             sprintf("%04d-%02d-%02d" , $decoded_json->[$_]->{'year'}, $decoded_json->[$_]->{'month'} ,$decoded_json->[$_]->{'dayOfMonth'})
         );
     }
     readingsEndUpdate( $hash, 1 );
