@@ -1101,15 +1101,18 @@ sub Processing_DpointGetChargerSessionsDaily {
      #Search in the returned data if it contains info for the specific day
      my @matches = grep { $_->{'dayOfMonth'} == $startDate->day && $_->{'month'} == $startDate->month && $_->{'year'} == $startDate->year } @{$decoded_json};
 
+      my $energyOffset = ($counter == 0) ?  ReadingsVal( $name, 'session_energy', 0 ) : 0;
+      my $costOffset = ($counter == 0) ?  ReadingsVal( $name, 'session_chargingCost', 0 ) : 0;
+
        readingsBulkUpdate(
            $hash,
            "daily_".($counter*-1)."_energy",
-           (scalar @matches == 1)? @matches[0]->{'totalEnergyUsage'} : 0
+           ((scalar @matches == 1)? @matches[0]->{'totalEnergyUsage'}: 0) + $energyOffset
        );
        readingsBulkUpdate(
            $hash,
            "daily_".($counter*-1)."_cost",
-           (scalar @matches == 1)? @matches[0]->{'totalCost'} : 0
+           ((scalar @matches == 1)? @matches[0]->{'totalCost'} : 0) + $costOffset
        );
 
        $startDate->add(days => -1);
