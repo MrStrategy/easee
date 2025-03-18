@@ -150,6 +150,8 @@ my %dpoints = (
     getChargerSessionsDaily   => 'sessions/charger/#ChargerID#/daily',
     getChargerState           => 'chargers/#ChargerID#/state',
     getCurrentSession         => 'chargers/#ChargerID#/sessions/ongoing',
+    getDailyEnergyConsumption => 'chargers/lifetime-energy/#ChargerID#/daily',
+    getMonthlyEnergyConsumption => 'chargers/lifetime-energy/#ChargerID#/monthly',
     getDynamicCurrent         => 'sites/#SiteID#/circuits/#CircuitId#/dynamicCurrent',
     setCableLockState         => 'chargers/#ChargerID#/commands/lock_state',
     setReboot                 => 'chargers/#ChargerID#/commands/reboot',
@@ -549,13 +551,18 @@ sub Attr {
 sub RefreshData {
     my $hash = shift;
     my $name = $hash->{NAME};
+
     WriteToCloudAPI( $hash, 'getChargerSite',            'GET' );
     WriteToCloudAPI( $hash, 'getChargerState',           'GET' );
-    WriteToCloudAPI( $hash, 'getCurrentSession',         'GET' );
     WriteToCloudAPI( $hash, 'getChargerConfiguration',   'GET' );
-    WriteToCloudAPI( $hash, 'getChargerSessionsMonthly', 'GET' );
-    WriteToCloudAPI( $hash, 'getChargerSessionsDaily',   'GET' );
+    WriteToCloudAPI( $hash, 'getMonthlyEnergyConsumption', 'GET' );
+    WriteToCloudAPI( $hash, 'getDailyEnergyConsumption',   'GET' );
     WriteToCloudAPI( $hash, 'getDynamicCurrent',         'GET' );
+
+    #Rate Limit. Just run every 6 minutes
+    if ($hash->{CURRENT_SESSION_REFRESH} + 360 < gettimeofday()) {
+        WriteToCloudAPI( $hash, 'getCurrentSession',         'GET' );
+    }
 
     return;    # immer mit einem return eine funktion beenden
 }
@@ -694,27 +701,43 @@ sub ResponseHandling {
     }
 
     my $code = $param->{code};
-    if ( $code == 404 and $param->{dpoint} eq 'getCurrentSession' )
-    {
-        readingsDelete( $hash, 'session_energy' );
-        readingsDelete( $hash, 'session_start' );
-        readingsDelete( $hash, 'session_end' );
-        readingsDelete( $hash, 'session_chargeDurationInSeconds' );
-        readingsDelete( $hash, 'session_firstEnergyTransfer' );
-        readingsDelete( $hash, 'session_lastEnergyTransfer' );
-        readingsDelete( $hash, 'session_pricePerKWH' );
-        readingsDelete( $hash, 'session_chargingCost' );
-        readingsDelete( $hash, 'session_id' );
-        return;
+
+    if ( $param->{dpoint} eq 'getCurrentSession' ) {
+
+        $hash->{CURRENT_SESSION_REFRESH} = gettimeofday();
+
+        if ( $code == 404  )
+        {
+            readingsDelete( $hash, 'session_energy' );
+            readingsDelete( $hash, 'session_start' );
+            readingsDelete( $hash, 'session_end' );
+            readingsDelete( $hash, 'session_chargeDurationInSeconds' );
+            readingsDelete( $hash, 'session_firstEnergyTransfer' );
+            readingsDelete( $hash, 'session_lastEnergyTransfer' );
+            readingsDelete( $hash, 'session_pricePerKWH' );
+            readingsDelete( $hash, 'session_chargingCost' );
+            readingsDelete( $hash, 'session_id' );
+            return;
+        }
     }
 
-    if ( $code >= 400 ) {
+
+    if ( $code == 429 ) {
+        Log3 $name, 2,
+            "Too many requests while requesting "
+          . $param->{url}
+          . " - $code. Most reporting services accept 10 requests per 60 minutes."; 
+    } elsif ( $code >= 400 ) {
         Log3 $name, 1,
             "HTTPS error while requesting "
           . $param->{url}
-          . " - $code";    # Eintrag fürs Log
-        readingsSingleUpdate( $hash, "lastResponse", "ERROR: HTTP Code $code",
-            1 );
+          . " - $code"; 
+    }
+
+    if ( $code >= 400 ) {
+        my $method = $param->{dpoint};
+        readingsSingleUpdate( $hash, "lastResponse", "ERROR: $method - HTTP Code $code", 1 );
+        readingsSingleUpdate( $hash, "lastError", "$method: HTTP Code $code", 1 );    
         return;
     }
 
@@ -742,13 +765,13 @@ sub ResponseHandling {
             return;
         }
 
-        if ( $param->{dpoint} eq 'getChargerSessionsDaily' ) {
-            Processing_DpointGetChargerSessionsDaily( $hash, $decoded_json );
+        if ( $param->{dpoint} eq 'getDailyEnergyConsumption' ) {
+            Processing_DpointGetDailyEnergyConsumption( $hash, $decoded_json );
             return;
         }
 
-        if ( $param->{dpoint} eq 'getChargerSessionsMonthly' ) {
-            Processing_DpointGetChargerSessionsMonthly( $hash, $decoded_json );
+        if ( $param->{dpoint} eq 'getMonthlyEnergyConsumption' ) {
+            Processing_DpointGetMonthlyEnergyConsumption( $hash, $decoded_json );
             return;
         }
 
@@ -1084,12 +1107,72 @@ sub Processing_DpointGetChargers {
     return;
 }
 
+sub Processing_DpointGetDailyEnergyConsumption {
+    my $hash         = shift;
+    my $decoded_json = shift;
+    my $name = $hash->{NAME};
+
+    Log3 $name, 5, 'Evaluating GetDailyEnergyConsumption';
+
+    #If less than 7 days of data is available. take only available data
+    #otherwise take days
+    my $arrayLength = scalar @{$decoded_json} ;
+    my $elementCount = min(7,$arrayLength);
+    my @a = ( ($elementCount * -1) .. -1 );
+    Log3 $name, 5, "Taking historic data of last $elementCount days";
+
+    readingsBeginUpdate($hash);
+    for (@a) {
+        readingsBulkUpdate(
+            $hash,
+            "daily_" . ( $_ + 1 ) . "_consumption",
+            sprintf( "%.2f", $decoded_json->[$_]->{'consumption'} )
+        );
+        readingsBulkUpdate(
+            $hash,
+            "daily_" . ( $_ + 1 ) . "_cost",
+            sprintf( "%.2f", $decoded_json->[$_]->{'consumption'} * ReadingsVal($name, "cost_perKWh", 0) )
+        );
+    }
+    readingsEndUpdate( $hash, 1 );
+    return;
+}
+
 sub Processing_DpointGetChargerSessionsDaily {
     my $hash         = shift;
     my $decoded_json = shift;
     my $name = $hash->{NAME};
 
     Log3 $name, 5, 'Evaluating getChargerSessionsDaily';
+
+
+   my $startDate = DateTime->now();
+   my $counter = 0;
+
+   readingsBeginUpdate($hash);
+   while( $counter <= 7 ) {
+
+     #Search in the returned data if it contains info for the specific day
+     my @matches = grep { $_->{'dayOfMonth'} == $startDate->day && $_->{'month'} == $startDate->month && $_->{'year'} == $startDate->year } @{$decoded_json};
+
+      my $energyOffset = ($counter == 0) ?  ReadingsVal( $name, 'session_energy', 0 ) : 0;
+      my $costOffset = ($counter == 0) ?  ReadingsVal( $name, 'session_chargingCost', 0 ) : 0;
+
+       readingsBulkUpdate(
+           $hash,
+           "daily_".($counter*-1)."_energy",
+           ((scalar @matches == 1)? @matches[0]->{'totalEnergyUsage'}: 0) + $energyOffset
+       );
+       readingsBulkUpdate(
+           $hash,
+           "daily_".($counter*-1)."_cost",
+           ((scalar @matches == 1)? @matches[0]->{'totalCost'} : 0) + $costOffset
+       );
+
+       $startDate->add(days => -1);
+       $counter++;
+   }
+   readingsEndUpdate( $hash, 1 );
 
     #If less than 7 days of data is available. take only available data
     #otherwise take days
@@ -1103,25 +1186,30 @@ sub Processing_DpointGetChargerSessionsDaily {
         Log3 $name, 5, 'laeuft noch: ' . $_;
         readingsBulkUpdate(
             $hash,
-            "daily_" . ( $_ + 1 ) . "_energy",
+            "dailyHistory_" . ( $_ + 1 ) . "_energy",
             sprintf( "%.2f", $decoded_json->[$_]->{'totalEnergyUsage'} )
         );
         readingsBulkUpdate(
             $hash,
-            "daily_" . ( $_ + 1 ) . "_cost",
+            "dailyHistory_" . ( $_ + 1 ) . "_cost",
             sprintf( "%.2f", $decoded_json->[$_]->{'totalCost'} )
+        );
+        readingsBulkUpdate(
+            $hash,
+            "dailyHistory_" . ( $_ + 1 ) . "_date",
+             sprintf("%04d-%02d-%02d" , $decoded_json->[$_]->{'year'}, $decoded_json->[$_]->{'month'} ,$decoded_json->[$_]->{'dayOfMonth'})
         );
     }
     readingsEndUpdate( $hash, 1 );
     return;
 }
 
-sub Processing_DpointGetChargerSessionsMonthly {
+sub Processing_DpointGetMonthlyEnergyConsumption {
     my $hash         = shift;
     my $decoded_json = shift;
     my $name = $hash->{NAME};
 
-    Log3 $name, 4, 'Evaluating getChargerSessionsMonthly';
+    Log3 $name, 4, 'Evaluating getMonthlyEnergyConsumption';
 
     #If less than 6 months of data is available. take only available data
     #otherwise take 6 months
@@ -1136,15 +1224,15 @@ sub Processing_DpointGetChargerSessionsMonthly {
         Log3 $name, 5, 'laeuft noch: ' . $_;
         readingsBulkUpdate(
             $hash,
-            "monthly_" . ( $_ + 1 ) . "_energy",
+            "monthly_" . ( $_ + 1 ) . "_consumption",
             sprintf(
-                "%.2f", $decoded_json->[$_]->{'totalEnergyUsage'}
+                "%.2f", $decoded_json->[$_]->{'consumption'}
             )
         );
         readingsBulkUpdate(
             $hash,
             "monthly_" . ( $_ + 1 ) . "_cost",
-            sprintf( "%.2f", $decoded_json->[$_]->{'totalCost'} )
+            sprintf( "%.2f", $decoded_json->[$_]->{'consumption'} * ReadingsVal($name, "cost_perKWh", 0) )
         );
     }
     readingsEndUpdate( $hash, 1 );
@@ -1177,7 +1265,7 @@ sub _loadToken {
           . localtime($tokenLifeTime);
 
         # if token is about to expire, refresh him
-        if ( ( $tokenLifeTime - 3700 ) < gettimeofday() ) {
+        if ( ( $tokenLifeTime - 600 ) < gettimeofday() ) {
             Log3 $name, 5,
               "EaseeWallbox $name" . ": "
               . "Token will expire soon, refreshing";
