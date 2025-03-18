@@ -555,13 +555,13 @@ sub RefreshData {
     WriteToCloudAPI( $hash, 'getChargerSite',            'GET' );
     WriteToCloudAPI( $hash, 'getChargerState',           'GET' );
     WriteToCloudAPI( $hash, 'getChargerConfiguration',   'GET' );
-    WriteToCloudAPI( $hash, 'getMonthlyEnergyConsumption', 'GET' );
-    WriteToCloudAPI( $hash, 'getDailyEnergyConsumption',   'GET' );
     WriteToCloudAPI( $hash, 'getDynamicCurrent',         'GET' );
 
     #Rate Limit. Just run every 6 minutes
     if ($hash->{CURRENT_SESSION_REFRESH} + 360 < gettimeofday()) {
         WriteToCloudAPI( $hash, 'getCurrentSession',         'GET' );
+        WriteToCloudAPI( $hash, 'getMonthlyEnergyConsumption', 'GET' );
+        WriteToCloudAPI( $hash, 'getDailyEnergyConsumption',   'GET' );
     }
 
     return;    # immer mit einem return eine funktion beenden
