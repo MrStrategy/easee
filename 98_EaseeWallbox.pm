@@ -551,13 +551,18 @@ sub Attr {
 sub RefreshData {
     my $hash = shift;
     my $name = $hash->{NAME};
+
     WriteToCloudAPI( $hash, 'getChargerSite',            'GET' );
     WriteToCloudAPI( $hash, 'getChargerState',           'GET' );
-    WriteToCloudAPI( $hash, 'getCurrentSession',         'GET' );
     WriteToCloudAPI( $hash, 'getChargerConfiguration',   'GET' );
     WriteToCloudAPI( $hash, 'getMonthlyEnergyConsumption', 'GET' );
     WriteToCloudAPI( $hash, 'getDailyEnergyConsumption',   'GET' );
     WriteToCloudAPI( $hash, 'getDynamicCurrent',         'GET' );
+
+    #Rate Limit. Just run every 6 minutes
+    if ($hash->{CURRENT_SESSION_REFRESH} + 360 < gettimeofday()) {
+        WriteToCloudAPI( $hash, 'getCurrentSession',         'GET' );
+    }
 
     return;    # immer mit einem return eine funktion beenden
 }
@@ -696,27 +701,43 @@ sub ResponseHandling {
     }
 
     my $code = $param->{code};
-    if ( $code == 404 and $param->{dpoint} eq 'getCurrentSession' )
-    {
-        readingsDelete( $hash, 'session_energy' );
-        readingsDelete( $hash, 'session_start' );
-        readingsDelete( $hash, 'session_end' );
-        readingsDelete( $hash, 'session_chargeDurationInSeconds' );
-        readingsDelete( $hash, 'session_firstEnergyTransfer' );
-        readingsDelete( $hash, 'session_lastEnergyTransfer' );
-        readingsDelete( $hash, 'session_pricePerKWH' );
-        readingsDelete( $hash, 'session_chargingCost' );
-        readingsDelete( $hash, 'session_id' );
-        return;
+
+    if ( $param->{dpoint} eq 'getCurrentSession' ) {
+
+        $hash->{CURRENT_SESSION_REFRESH} = gettimeofday();
+
+        if ( $code == 404  )
+        {
+            readingsDelete( $hash, 'session_energy' );
+            readingsDelete( $hash, 'session_start' );
+            readingsDelete( $hash, 'session_end' );
+            readingsDelete( $hash, 'session_chargeDurationInSeconds' );
+            readingsDelete( $hash, 'session_firstEnergyTransfer' );
+            readingsDelete( $hash, 'session_lastEnergyTransfer' );
+            readingsDelete( $hash, 'session_pricePerKWH' );
+            readingsDelete( $hash, 'session_chargingCost' );
+            readingsDelete( $hash, 'session_id' );
+            return;
+        }
     }
 
-    if ( $code >= 400 ) {
+
+    if ( $code == 429 ) {
+        Log3 $name, 2,
+            "Too many requests while requesting "
+          . $param->{url}
+          . " - $code. Most reporting services accept 10 requests per 60 minutes."; 
+    } elsif ( $code >= 400 ) {
         Log3 $name, 1,
             "HTTPS error while requesting "
           . $param->{url}
-          . " - $code";    # Eintrag fürs Log
-        readingsSingleUpdate( $hash, "lastResponse", "ERROR: HTTP Code $code",
-            1 );
+          . " - $code"; 
+    }
+
+    if ( $code >= 400 ) {
+        my $method = $param->{dpoint};
+        readingsSingleUpdate( $hash, "lastResponse", "ERROR: $method - HTTP Code $code", 1 );
+        readingsSingleUpdate( $hash, "lastError", "$method: HTTP Code $code", 1 );    
         return;
     }
 
@@ -1244,7 +1265,7 @@ sub _loadToken {
           . localtime($tokenLifeTime);
 
         # if token is about to expire, refresh him
-        if ( ( $tokenLifeTime - 3700 ) < gettimeofday() ) {
+        if ( ( $tokenLifeTime - 600 ) < gettimeofday() ) {
             Log3 $name, 5,
               "EaseeWallbox $name" . ": "
               . "Token will expire soon, refreshing";
