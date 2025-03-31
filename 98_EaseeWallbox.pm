@@ -518,7 +518,7 @@ sub Set {
     return;
 }
 
-sub Attr {
+sub Attr(@) {
     my ( $cmd, $name, $attrName, $attrVal ) = @_;
     my $hash = $defs{$name};
 
@@ -558,7 +558,7 @@ sub RefreshData {
     WriteToCloudAPI( $hash, 'getDynamicCurrent',         'GET' );
 
     #Rate Limit. Just run every 6 minutes
-    if ($hash->{CURRENT_SESSION_REFRESH} + 360 < gettimeofday()) {
+    if (($hash->{CURRENT_SESSION_REFRESH} //= 0) + 360 < gettimeofday()) {
         WriteToCloudAPI( $hash, 'getCurrentSession',         'GET' );
         WriteToCloudAPI( $hash, 'getMonthlyEnergyConsumption', 'GET' );
         WriteToCloudAPI( $hash, 'getDailyEnergyConsumption',   'GET' );
@@ -1161,12 +1161,12 @@ sub Processing_DpointGetChargerSessionsDaily {
        readingsBulkUpdate(
            $hash,
            "daily_".($counter*-1)."_energy",
-           ((scalar @matches == 1)? @matches[0]->{'totalEnergyUsage'}: 0) + $energyOffset
+           ((scalar @matches == 1)? $matches[0]->{'totalEnergyUsage'}: 0) + $energyOffset
        );
        readingsBulkUpdate(
            $hash,
            "daily_".($counter*-1)."_cost",
-           ((scalar @matches == 1)? @matches[0]->{'totalCost'} : 0) + $costOffset
+           ((scalar @matches == 1)? $matches[0]->{'totalCost'} : 0) + $costOffset
        );
 
        $startDate->add(days => -1);
