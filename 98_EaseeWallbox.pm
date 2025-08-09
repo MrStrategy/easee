@@ -1446,7 +1446,6 @@ sub _decrypt {
     return $decoded;
 }
 
-1;
 
 sub _transcodeDate {
     my $datestr = shift;
