@@ -263,8 +263,7 @@ sub Initialize {
     $hash->{WriteFn} = \&Write;
 
     $hash->{AttrList} =
-        'expertMode:yes,no '
-      . 'interval '
+        'interval '
       . 'SmartCharging:true,false '
       . $readingFnAttributes;
 
@@ -1533,7 +1532,6 @@ sub NumericToBoolean {
 <b>Attributes</b>
 <ul>
   <li>interval - polling interval in seconds (default 60)</li>
-  <li>expertMode&nbsp;yes|no</li>
   <li>SmartCharging&nbsp;true|false - automatically enable smart charging</li>
 </ul>
 <br>
