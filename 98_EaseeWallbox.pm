@@ -235,34 +235,21 @@ my %commandCodes = (
 #Private function to evaluate command-lists
 sub _GetCmdList {
     my ( $hash, $cmd, $commands ) = @_;
-
     my %cmdArray = %$commands;
     my $name     = $hash->{NAME};
-    my $retVal;
 
-    #return, if cmd is valid
+    # return, if cmd is valid
     return if ( defined($cmd) and defined( $cmdArray{$cmd} ) );
 
-    #response for gui or the user, if command is invalid
-    foreach my $mySet ( keys %cmdArray ) {
-        #append set-command
-        if (defined $retVal){
-            $retVal = $retVal . " " . $mySet;
-        } else {
-            $retVal = $mySet;
-        }
+    # response for gui or the user, if command is invalid
+    my $retVal = join ' ',
+      map {
+          my $opt = $cmdArray{$_};
+          ( defined($opt) and length($opt) ) ? "$_:$opt" : $_;
+      } keys %cmdArray;
 
-        #get options
-        my $myOpt = $cmdArray{$mySet};
-        #append option, if valid
-        $retVal = $retVal . ":" . $myOpt
-          if ( defined($myOpt) and ( length($myOpt) > 0 ) );
-        $myOpt = "" if ( !defined($myOpt) );
-    }
-    if ( !defined($retVal) ) {
-        return "error while parsing set-table";
-    }
-    return "Unknown argument $cmd, choose one of " . $retVal;
+    return "error while parsing set-table" if ( !defined($retVal) or $retVal eq '' );
+    return "Unknown argument $cmd, choose one of $retVal";
 }
 
 sub Initialize {
