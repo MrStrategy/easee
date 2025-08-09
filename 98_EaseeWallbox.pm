@@ -88,14 +88,13 @@ BEGIN {
           ReadingsVal
           RemoveInternalTimer
           InternalTimer
-          HttpUtils_NonblockingGet
-          HttpUtils_BlockingGet
-          gettimeofday
-          getUniqueId
-          Attr
-          defs
-          )
-    );
+            HttpUtils_NonblockingGet
+            HttpUtils_BlockingGet
+            gettimeofday
+            getUniqueId
+            defs
+            )
+      );
 }
 
 #-- Export to main context with different name
@@ -1153,13 +1152,13 @@ sub Processing_DpointGetChargerSessionsDaily {
        readingsBulkUpdate(
            $hash,
            "daily_".($counter*-1)."_energy",
-           ((scalar @matches == 1)? @matches[0]->{'totalEnergyUsage'}: 0) + $energyOffset
-       );
+            ((scalar @matches == 1)? $matches[0]->{'totalEnergyUsage'}: 0) + $energyOffset
+        );
        readingsBulkUpdate(
            $hash,
            "daily_".($counter*-1)."_cost",
-           ((scalar @matches == 1)? @matches[0]->{'totalCost'} : 0) + $costOffset
-       );
+            ((scalar @matches == 1)? $matches[0]->{'totalCost'} : 0) + $costOffset
+        );
 
        $startDate->add(days => -1);
        $counter++;
