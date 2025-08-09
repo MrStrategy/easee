@@ -309,38 +309,45 @@ sub Define {
     my $password = _encrypt( $param[3] );
     $hash->{Password} = $password;
 
-    if ( defined $param[4] ) {
-        $hash->{DEF} = sprintf( "%s %s %s",
-            InternalVal( $name, 'Username', undef ),
-            $password, $param[4] );
-    }
-    else {
-        $hash->{DEF} = sprintf( "%s %s",
-            InternalVal( $name, 'Username', undef ), $password );
-    }
+    my @defParts = (
+        InternalVal( $name, 'Username', undef ),
+        $password
+    );
 
-    #Check if interval is set and numeric.
-    #If not set -> set to 60 seconds
-    #If less then 5 seconds set to 5
-    #If not an integer abort with failure.
-    my $interval = 60;
+    #Check if interval and/or chargerID are set. Both parameters are optional
+    #and may be provided in any combination. If the first optional parameter
+    #is numeric, it is treated as interval, otherwise as chargerID.
+    my $interval  = 60;    # default interval
+    my $chargerID;
+
     if ( defined $param[4] ) {
-        if ( $param[4] =~ /^\d+$/x )
-        { # Regular expression without "/x" flag. See page 236 of PBP (RegularExpressions::RequireExtendedFormatting)
+        if ( $param[4] =~ /^\d+$/x ) {
             $interval = $param[4];
+            push @defParts, $param[4];
+            if ( defined $param[5] ) {
+                $chargerID = $param[5];
+                push @defParts, $param[5];
+            }
         }
         else {
-            $errmsg =
-"Specify valid integer value for interval. Whole numbers > 5 only. Format: define <name> EaseeWallbox <username> <password> [interval]  [chargerID]";
-            Log3 $name, 1, "EaseeWallbox $name: " . $errmsg;
-            return $errmsg;
+            $chargerID = $param[4];
+            push @defParts, $param[4];
         }
+    }
+
+    if ( $interval !~ /^\d+$/x ) {
+        $errmsg =
+"Specify valid integer value for interval. Whole numbers > 5 only. Format: define <name> EaseeWallbox <username> <password> [interval]  [chargerID]";
+        Log3 $name, 1, "EaseeWallbox $name: " . $errmsg;
+        return $errmsg;
     }
 
     if ( $interval < 5 ) { $interval = 5; }
     $hash->{INTERVAL} = $interval;
 
-    $hash->{FIXED_CHARGER_ID} = $param[5] if defined $param[5];
+    $hash->{FIXED_CHARGER_ID} = $chargerID if defined $chargerID;
+
+    $hash->{DEF} = join( ' ', @defParts );
 
     readingsSingleUpdate( $hash, 'state', 'Undefined', 0 );
 
