@@ -286,8 +286,8 @@ sub Define {
 
     # Check parameter(s) - Must be min 4 in total (counts strings not purly parameter, interval is optional)
     if ( int(@param) < 4 ) {
-        $errmsg = return
-                "syntax error: define <name> EaseeWallbox <username> <password> [interval] [chargerID]";
+        $errmsg =
+          "syntax error: define <name> EaseeWallbox <username> <password> [interval] [chargerID]";
         Log3 $name, 1, "EaseeWallbox $name: " . $errmsg;
         return $errmsg;
     }
