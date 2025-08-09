@@ -107,7 +107,6 @@ GP_Export(
 
 my %gets = (
     update  => "noArg",
-    health  => "noArg",
     charger => "noArg",
 );
 
@@ -1474,6 +1473,81 @@ sub NumericToBoolean {
 1;    # Ein Modul muss immer mit 1; enden
 
 =pod
+=item device
+=item summary       Modul to communicate with EaseeCloud
+=item summary_DE    Modul zur Kommunikation mit der EaseeCloud
 =begin html
+
+<a name="EaseeWallbox"></a>
+<h3>EaseeWallbox</h3>
+<ul>
+  <i>EaseeWallbox</i> connects your FHEM instance with the Easee Cloud to interact with your Easee wallbox. All communication takes place via the Easee cloud API and the cloud interacts with the wallbox. If the wallbox is offline none of the functions within this module will work.
+</ul>
+<br>
+<a name="EaseeWallboxdefine"></a>
+<b>Define</b>
+<ul>
+  <code>define &lt;name&gt; EaseeWallbox &lt;username&gt; &lt;password&gt; [&lt;interval&gt;] [&lt;chargerID&gt;]</code><br>
+  Interval is the polling interval in seconds (default 60, minimum 5). The optional chargerID selects a specific charger when multiple chargers are registered.
+</ul>
+<br>
+<a name="EaseeWallboxset"></a>
+<b>Set</b>
+<ul>
+  <li>activateTimer - start periodic refresh of readings</li>
+  <li>deactivateTimer - stop periodic refresh of readings</li>
+  <li>startCharging - allow a charger with authorizationRequired&nbsp;= true to deliver power; otherwise no effect</li>
+  <li>stopCharging - stop an authorized charger from delivering power and revoke authorization; no effect if authorizationRequired is false or the charger is not authorized</li>
+  <li>pauseCharging - pause the current charging session but keep authorization; limits dynamic charger current to 0 and resets on new car connection</li>
+    <li>resumeCharging - resume a paused charging session and restore dynamic charger current limits</li>
+    <li>enabled / disabled - enable or disable the charger</li>
+  <li>enableSmartButton&nbsp;true|false - enable or disable the smart button</li>
+  <li>authorizationRequired&nbsp;true|false - require authorization before charging starts</li>
+  <li>cableLock&nbsp;true|false - permanently lock or unlock the charging cable</li>
+  <li>enableSmartCharging&nbsp;true|false - switch smart charging on or off</li>
+  <li>ledStripBrightness&nbsp;&lt;0-100&gt; - set LED strip brightness</li>
+  <li>dynamicCurrent&nbsp;&lt;p1&gt; &lt;p2&gt; &lt;p3&gt; [&lt;ttl&gt;] - set dynamic current for each phase with optional time‑to‑live</li>
+  <li>pairRfidTag&nbsp;[&lt;timeout&gt;] - start RFID pairing (default 60&nbsp;s)</li>
+  <li>pricePerKWH&nbsp;&lt;price&gt; - set price per kWh (currency EUR, VAT 19%)</li>
+  <li>refreshToken - refresh OAuth token</li>
+  <li>reboot - reboot the charger</li>
+  <li>updateFirmware - trigger firmware update</li>
+  <li>overrideChargingSchedule</li>
+</ul>
+<br>
+<a name="EaseeWallboxget"></a>
+<b>Get</b>
+<ul>
+  <li>update - refresh all data immediately</li>
+    <li>charger - reload basic charger information</li>
+  </ul>
+<br>
+<a name="EaseeWallboxattr"></a>
+<b>Attributes</b>
+<ul>
+  <li>interval - polling interval in seconds (default 60)</li>
+  <li>expertMode&nbsp;yes|no</li>
+  <li>SmartCharging&nbsp;true|false - automatically enable smart charging</li>
+</ul>
+<br>
+<a name="EaseeWallboxreadings"></a>
+<b>Readings</b>
+<ul>
+  <li><b>Basic information</b></li>
+  <li>charger_id, charger_name, site_id, site_key, circuit_id</li>
+  <li><b>Charger configuration</b></li>
+  <li>isEnabled, isCablePermanentlyLocked, isAuthorizationRequired, isRemoteStartRequired, isSmartButtonEnabled, isLocalAuthorizationRequired, wiFiSSID, phaseModeId, phaseMode, maxChargerCurrent, ledStripBrightness</li>
+  <li><b>Site configuration</b></li>
+  <li>cost_perKWh, cost_perKwhExcludeVat, cost_vat, cost_currency</li>
+  <li><b>Charger state</b></li>
+  <li>operationModeCode, operationMode, online, power, current, dynamicCurrent, kWhInSession, latestPulse, reasonCodeForNoCurrent, reasonForNoCurrent, errorCode, fatalErrorCode, lifetimeEnergy, voltage, wifi_rssi, wifi_apEnabled, cell_rssi</li>
+  <li><b>Current session</b></li>
+  <li>session_energy, session_start, session_end, session_chargeDurationInSeconds, session_firstEnergyTransfer, session_lastEnergyTransfer, session_pricePerKWH, session_chargingCost, session_id</li>
+  <li><b>Dynamic current</b></li>
+  <li>dynamicCurrent_phase1, dynamicCurrent_phase2, dynamicCurrent_phase3</li>
+  <li><b>Historic consumption</b></li>
+  <li>daily_1_consumption .. daily_7_consumption, daily_1_cost .. daily_7_cost</li>
+</ul>
+<br>
 =end html
 =cut
