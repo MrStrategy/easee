@@ -549,7 +549,7 @@ sub RefreshData {
     WriteToCloudAPI( $hash, 'getDynamicCurrent',         'GET' );
 
     #Rate Limit. Just run every 6 minutes
-    if ($hash->{CURRENT_SESSION_REFRESH} + 360 < gettimeofday()) {
+    if ( ( $hash->{CURRENT_SESSION_REFRESH} // 0 ) + 360 < gettimeofday() ) {
         WriteToCloudAPI( $hash, 'getCurrentSession',         'GET' );
         WriteToCloudAPI( $hash, 'getMonthlyEnergyConsumption', 'GET' );
         WriteToCloudAPI( $hash, 'getDailyEnergyConsumption',   'GET' );
@@ -644,10 +644,11 @@ sub WriteToCloudAPI {
 
 
     my $CurrentTokenData = _loadToken($hash);
+    my $tokenType        = $CurrentTokenData->{'tokenType'}   // '';
+    my $accessToken      = $CurrentTokenData->{'accessToken'} // '';
     my $header           = {
         "Content-Type" => "application/json;charset=UTF-8",
-        "Authorization" =>
-          "$CurrentTokenData->{'tokenType'} $CurrentTokenData->{'accessToken'}"
+        "Authorization" => "$tokenType $accessToken"
     };
 
     # $method ist GET oder POST
@@ -1317,8 +1318,8 @@ sub _newTokenRequest {
 
             # token lifetime management
             if ( defined($decoded_data) ) {
-                $hash->{TOKEN_LIFETIME} =
-                  gettimeofday() + $decoded_data->{'expiresIn'};
+                $hash->{TOKEN_LIFETIME} = gettimeofday()
+                  + ( $decoded_data->{'expiresIn'} // 0 );
             }
             $hash->{TOKEN_LIFETIME_HR} = localtime( $hash->{TOKEN_LIFETIME} );
             Log3 $name, 5,
