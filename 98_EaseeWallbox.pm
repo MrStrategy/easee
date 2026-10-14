@@ -2,7 +2,6 @@ package FHEM::EaseeWallbox;
 
 use strict;
 use warnings;
-use Data::Dumper;
 use utf8;
 use Encode qw( encode_utf8 );
 use HttpUtils;
@@ -10,6 +9,7 @@ use JSON;
 use DateTime;
 use DateTime::Format::Strptime;
 use List::Util qw(min);
+use Time::Local qw(timegm);
 
 # try to use JSON::MaybeXS wrapper
 #   for chance of better performance + open code
@@ -146,7 +146,7 @@ my %dpoints = (
     getChargerConfiguration   => 'chargers/#ChargerID#/config',
     getChargerSessionsMonthly => 'sessions/charger/#ChargerID#/monthly',
     getChargerSessionsDaily   => 'sessions/charger/#ChargerID#/daily',
-    getChargerState           => 'chargers/#ChargerID#/state',
+    getChargerState           => 'state/#ChargerID#/observations?ids=48,96,109,110,114,119,120,121,124,130,132,250',
     getCurrentSession         => 'chargers/#ChargerID#/sessions/ongoing',
     getDailyEnergyConsumption => 'chargers/lifetime-energy/#ChargerID#/daily',
     getMonthlyEnergyConsumption => 'chargers/lifetime-energy/#ChargerID#/monthly',
@@ -579,7 +579,9 @@ sub WriteToCloudAPI {
     my $method  = shift;
     my $message = shift;
     my $name    = $hash->{NAME};
-    my $url     = $hash->{APIURI} . $dpoints{$dpoint};
+    my $url     = $dpoint eq 'getChargerState'
+      ? 'https://api.easee.com/' . $dpoints{$dpoint}
+      : $hash->{APIURI} . $dpoints{$dpoint};
     my $chargerId;
     my $siteId;
     my $payload;
@@ -644,6 +646,16 @@ sub WriteToCloudAPI {
 
 
     my $CurrentTokenData = _loadToken($hash);
+    if ( !_validTokenPair($CurrentTokenData)
+        || !defined($hash->{TOKEN_LIFETIME})
+        || $hash->{TOKEN_LIFETIME} <= gettimeofday() ) {
+        my $error = 'No valid Easee OAuth token available; request not sent';
+        Log3 $name, 1, "EaseeWallbox $name: $error";
+        readingsSingleUpdate( $hash, 'lastResponse', "ERROR: $error", 1 );
+        _chargerStateFailure($hash, 'Authentication failed')
+          if $dpoint eq 'getChargerState';
+        return $error;
+    }
     my $tokenType        = $CurrentTokenData->{'tokenType'}   // '';
     my $accessToken      = $CurrentTokenData->{'accessToken'} // '';
     my $header           = {
@@ -680,15 +692,18 @@ sub ResponseHandling {
     my $decoded_json;
     my $value;
 
+    my $is_charger_state = ($param->{dpoint} // '') eq 'getChargerState';
+
     Log3 $name, 4, "Callback received. " . $param->{url};
 
-    if ( $err ne "" )    # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
+    if ( defined($err) && $err ne "" )    # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
     {
         Log3 $name, 1,
             "error while requesting "
           . $param->{url}
           . " - $err";    # Eintrag fürs Log
         readingsSingleUpdate( $hash, "lastResponse", "ERROR $err", 1 );
+        _chargerStateFailure($hash, "Network error: $err") if $is_charger_state;
         return;
     }
 
@@ -730,6 +745,20 @@ sub ResponseHandling {
         my $method = $param->{dpoint};
         readingsSingleUpdate( $hash, "lastResponse", "ERROR: $method - HTTP Code $code", 1 );
         readingsSingleUpdate( $hash, "lastError", "$method: HTTP Code $code", 1 );    
+        _chargerStateFailure($hash, "HTTP $code") if $is_charger_state;
+        return;
+    }
+
+    if ($is_charger_state) {
+        my $decode_ok = eval { $decoded_json = decode_json($data); 1 };
+        if ($decode_ok && ref($decoded_json) eq 'HASH'
+            && ref($decoded_json->{observations}) eq 'ARRAY'
+            && @{ $decoded_json->{observations} }) {
+            Processing_DpointGetChargerState($hash, $decoded_json->{observations});
+        }
+        else {
+            _chargerStateFailure($hash, 'Invalid or empty observations payload');
+        }
         return;
     }
 
@@ -746,7 +775,6 @@ sub ResponseHandling {
 
     eval { $decoded_json = decode_json($data) }; # statt eval ist es empfohlen catch try zu verwenden. Machen wir später
 
-    Log3 $name, 5, 'Decoded Payload: ' . Dumper($decoded_json);
     if (    defined $decoded_json
         and $decoded_json ne ''
         and ref($decoded_json) eq "HASH"
@@ -848,43 +876,95 @@ sub Processing_DpointGetChargerState {
 
     my $name = $hash->{NAME};
 
+    my %reading_for_id = (
+        109 => [qw(operationModeCode operationMode)], 120 => ['power'],
+        121 => ['kWhInSession'], 110 => ['phase'], 114 => ['current'],
+        48 => ['dynamicCurrent'], 96 => [qw(reasonCodeForNoCurrent reasonForNoCurrent)],
+        119 => ['errorCode'], 124 => ['lifetimeEnergy'], 250 => ['online'],
+        132 => ['wifi_rssi'], 130 => ['cell_rssi'],
+    );
+    my $valid_count = 0;
     readingsBeginUpdate($hash);
-    readingsBulkUpdate( $hash, "operationModeCode",
-        $decoded_json->{chargerOpMode} );
-    readingsBulkUpdate( $hash, "operationMode",
-        $operationModes{ $decoded_json->{chargerOpMode} } );
-    readingsBulkUpdate( $hash, "power",
-        sprintf( "%.2f", $decoded_json->{totalPower} ) );
-    readingsBulkUpdate( $hash, "kWhInSession",
-        sprintf( "%.2f", $decoded_json->{sessionEnergy} ) );
-    readingsBulkUpdate( $hash, "phase", $decoded_json->{outputPhase} );
-    readingsBulkUpdate( $hash, "latestPulse",
-        _transcodeDate( $decoded_json->{latestPulse} ) );
-    readingsBulkUpdate( $hash, "current",
-        $decoded_json->{outputCurrent} );
-    readingsBulkUpdate( $hash, "dynamicCurrent",
-        $decoded_json->{dynamicChargerCurrent} );
-    readingsBulkUpdate( $hash, "reasonCodeForNoCurrent",
-        $decoded_json->{reasonForNoCurrent} );
-    readingsBulkUpdate( $hash, "reasonForNoCurrent",
-        $reasonsForNoCurrent{ $decoded_json->{reasonForNoCurrent} } );
-    readingsBulkUpdate( $hash, "errorCode",
-        $decoded_json->{errorCode} );
-    readingsBulkUpdate( $hash, "fatalErrorCode",
-        $decoded_json->{fatalErrorCode} );
-    readingsBulkUpdate( $hash, "lifetimeEnergy",
-        sprintf( "%.2f", $decoded_json->{lifetimeEnergy} ) );
-    readingsBulkUpdate( $hash, "online",
-        NumericToBoolean($decoded_json->{isOnline} ));
-    readingsBulkUpdate( $hash, "voltage",
-        sprintf( "%.2f", $decoded_json->{voltage} ) );
-    readingsBulkUpdate( $hash, "wifi_rssi", $decoded_json->{wiFiRSSI} );
-    readingsBulkUpdate( $hash, "wifi_apEnabled",
-        NumericToBoolean($decoded_json->{wiFiAPEnabled} ));
-    readingsBulkUpdate( $hash, "cell_rssi", $decoded_json->{cellRSSI} );
-    readingsBulkUpdate( $hash, "lastResponse",
-        'OK - getChargerState', 1 );
-    readingsEndUpdate( $hash, 1 );
+    for my $observation (@$decoded_json) {
+        next unless ref($observation) eq 'HASH'
+          && defined $observation->{id} && !ref($observation->{id})
+          && $observation->{id} =~ /^\d+$/ && exists $reading_for_id{$observation->{id}}
+          && exists $observation->{value}
+          && _validObservationValue($observation->{id}, $observation->{value})
+          && defined $observation->{timestamp} && !ref($observation->{timestamp});
+        my $timestamp = $observation->{timestamp};
+        next unless _isCanonicalSourceTimestamp($timestamp);
+        $valid_count++;
+        my $id = $observation->{id};
+        my @readings = @{ $reading_for_id{$id} };
+        my $reading = $readings[0];
+        my $previous = ReadingsVal($name, "${reading}_sourceTimestamp", '');
+        next if _isCanonicalSourceTimestamp($previous)
+          && $timestamp le $previous;
+        my $v = $observation->{value};
+        if ($id == 109) {
+            readingsBulkUpdate($hash, $readings[0], $v);
+            readingsBulkUpdate($hash, $readings[1],
+                exists $operationModes{$v} ? $operationModes{$v} : "Unknown($v)");
+        } elsif ($id == 96) {
+            readingsBulkUpdate($hash, $readings[0], $v);
+            readingsBulkUpdate($hash, $readings[1],
+                exists $reasonsForNoCurrent{$v} ? $reasonsForNoCurrent{$v} : "Unknown($v)");
+        } elsif ($id == 120 || $id == 121 || $id == 124) {
+            readingsBulkUpdate($hash, $reading, sprintf('%.2f', $v));
+        } elsif ($id == 250) {
+            readingsBulkUpdate($hash, $reading, NumericToBoolean($v));
+        } else {
+            readingsBulkUpdate($hash, $reading, $v);
+        }
+        readingsBulkUpdate($hash, "${_}_sourceTimestamp", $timestamp)
+          for @readings;
+    }
+    readingsEndUpdate($hash, 1);
+    if (!$valid_count) {
+        _chargerStateFailure($hash, 'No valid observations');
+        return;
+    }
+    readingsSingleUpdate($hash, 'chargerStateStatus', 'ok', 1);
+    readingsSingleUpdate($hash, 'chargerStateError', '', 1);
+    readingsSingleUpdate($hash, 'lastChargerStatePoll', scalar localtime, 1);
+    readingsSingleUpdate($hash, 'lastResponse', 'OK - getChargerState', 1);
+    return;
+}
+
+sub _isCanonicalSourceTimestamp {
+    my ($timestamp) = @_;
+    return unless defined($timestamp)
+      && $timestamp =~ /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)\.\d{3}Z$/;
+    my ($year, $month, $day, $hour, $minute, $second) = ($1, $2, $3, $4, $5, $6);
+    return if $month < 1 || $month > 12 || $hour > 23 || $minute > 59 || $second > 59;
+    my $epoch = eval { timegm($second, $minute, $hour, $day, $month - 1, $year) };
+    return if $@ || !defined $epoch;
+    my @utc = gmtime($epoch);
+    return $utc[5] + 1900 == $year && $utc[4] + 1 == $month && $utc[3] == $day;
+}
+
+sub _validObservationValue {
+    my ($id, $value) = @_;
+    return unless defined $value;
+    if ($id == 250) {
+        return ref($value) && ref($value) =~ /::Boolean$/;
+    }
+    return if ref($value);
+    return unless $value =~ /^-?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+    if ($id == 109 || $id == 96 || $id == 110 || $id == 119) {
+        return unless $value =~ /^-?\d+$/;
+    }
+    return 1;
+}
+
+sub _chargerStateFailure {
+    my ($hash, $error) = @_;
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash, 'chargerStateStatus', 'error');
+    readingsBulkUpdate($hash, 'chargerStateError', $error);
+    readingsBulkUpdate($hash, 'lastChargerStatePoll', scalar localtime);
+    readingsEndUpdate($hash, 1);
     return;
 }
 
@@ -1236,19 +1316,18 @@ sub _loadToken {
     my $name          = $hash->{NAME};
     my $tokenLifeTime = $hash->{TOKEN_LIFETIME};
     $tokenLifeTime = 0 if ( !defined $tokenLifeTime || $tokenLifeTime eq '' );
-    my $token;
+    my $token = $hash->{'.TOKEN'};
+    my $now = gettimeofday();
 
-    $token = $hash->{'.TOKEN'};
-
-    if ( $@ || $tokenLifeTime < gettimeofday() ) {
-        Log3 $name, 5,
-          "EaseeWallbox $name" . ": "
-          . "Error while loading: $@ ,requesting new one"
-          if $@;
+    if ( !_validTokenPair($token) || $tokenLifeTime < $now ) {
         Log3 $name, 5,
           "EaseeWallbox $name" . ": " . "Token is expired, requesting new one"
-          if $tokenLifeTime < gettimeofday();
-        $token = _newTokenRequest($hash);
+          if $tokenLifeTime < $now;
+        my $new_token = _newTokenRequest($hash);
+        if (_validTokenPair($new_token)) {
+            $token = $new_token;
+            $tokenLifeTime = $hash->{TOKEN_LIFETIME};
+        }
     }
     else {
         Log3 $name, 5,
@@ -1257,16 +1336,19 @@ sub _loadToken {
           . localtime($tokenLifeTime);
 
         # if token is about to expire, refresh him
-        if ( ( $tokenLifeTime - 600 ) < gettimeofday() ) {
+        if ( ( $tokenLifeTime - 600 ) < $now ) {
             Log3 $name, 5,
               "EaseeWallbox $name" . ": "
               . "Token will expire soon, refreshing";
-            $token = _tokenRefresh($hash);
+            my $new_token = _tokenRefresh($hash);
+            if (_validTokenPair($new_token)) {
+                $token = $new_token;
+                $tokenLifeTime = $hash->{TOKEN_LIFETIME};
+            }
         }
     }
 
-    $token = $token ? $token : undef;
-    return $token;
+    return _validTokenPair($token) && $tokenLifeTime > $now ? $token : undef;
 }
 
 sub _newTokenRequest {
@@ -1290,37 +1372,28 @@ sub _newTokenRequest {
         hash    => $hash,
         data    => encode_json $data
     };
-    Log3 $name, 5, 'Request: ' . Dumper($param);
+    Log3 $name, 5, "EaseeWallbox $name: requesting OAuth token (credentials omitted)";
 
     #Log3 $name, 5, 'Blocking GET: ' . Dumper($param);
     #Log3 $name, $reqDebug, "EaseeWallbox $name" . ": " . "Request $AuthURL";
     my ( $err, $returnData ) = HttpUtils_BlockingGet($param);
 
-    if ( $err ne "" ) {
+    if ( defined($err) && $err ne "" ) {
         Log3 $name, 3,
             "EaseeWallbox $name" . ": "
-          . "NewTokenRequest: Error while requesting "
-          . $param->{url}
-          . " - $err";
+          . "NewTokenRequest: transport failure";
     }
     elsif ( $returnData ne "" ) {
-        Log3 $name, 5, "url " . $param->{url} . " returned: $returnData";
         my $decoded_data = eval { decode_json($returnData) };
         if ($@) {
             Log3 $name, 3, "EaseeWallbox $name" . ": "
-              . "NewTokenRequest: decode_json failed, invalid json. error: $@ ";
+              . "NewTokenRequest: response was not valid JSON";
         }
         else {
-            #write token data in hash
-            if ( defined($decoded_data) ) {
-                $hash->{'.TOKEN'} = $decoded_data;
-            }
-
-            # token lifetime management
-            if ( defined($decoded_data) ) {
-                $hash->{TOKEN_LIFETIME} = gettimeofday()
-                  + ( $decoded_data->{'expiresIn'} // 0 );
-            }
+            my $lifetime = _tokenLifetime($decoded_data);
+            return unless _validTokenPair($decoded_data) && $lifetime;
+            $hash->{'.TOKEN'} = $decoded_data;
+            $hash->{TOKEN_LIFETIME} = gettimeofday() + $lifetime;
             $hash->{TOKEN_LIFETIME_HR} = localtime( $hash->{TOKEN_LIFETIME} );
             Log3 $name, 5,
                 "EaseeWallbox $name" . ": "
@@ -1356,46 +1429,38 @@ sub _tokenRefresh {
         data    => encode_json $data
     };
 
-    Log3 $name, 5, 'Request: ' . Dumper($param);
+    Log3 $name, 5, "EaseeWallbox $name: refreshing OAuth token (tokens omitted)";
 
     #Log3 $name, 5, 'Blocking GET TokenRefresh: ' . Dumper($param);
     #Log3 $name, $reqDebug, "EaseeWallbox $name" . ": " . "Request $AuthURL";
     my ( $err, $returnData ) = HttpUtils_BlockingGet($param);
 
-    if ( $err ne "" ) {
+    if ( defined($err) && $err ne "" ) {
         Log3 $name, 3,
             "EaseeWallbox $name" . ": "
-          . "TokenRefresh: Error in token retrival while requesting "
-          . $param->{url}
-          . " - $err";
+          . "TokenRefresh: transport failure";
 
         # $hash->{STATE} = "error";
         readingsSingleUpdate( $hash, 'state', 'error', 1 );
     }
 
     elsif ( $returnData ne "" ) {
-        Log3 $name, 5, "url " . $param->{url} . " returned: $returnData";
         my $decoded_data = eval { decode_json($returnData); };
 
         if ($@) {
             Log3 $name, 3,
               "EaseeWallbox $name" . ": "
-              . "TokenRefresh: decode_json failed, invalid json. error:$@\n"
+              . "TokenRefresh: response was not valid JSON\n"
               if $@;
 
             # $hash->{STATE} = "error";
             readingsSingleUpdate( $hash, 'state', 'error', 1 );
         }
         else {
-            #write token data in file
-            if ( defined($decoded_data) ) {
-                $hash->{'.TOKEN'} = $decoded_data;
-
-            }
-
-            # token lifetime management
-            $hash->{TOKEN_LIFETIME} =
-              gettimeofday() + $decoded_data->{'expires_in'};
+            my $lifetime = _tokenLifetime($decoded_data);
+            return unless _validTokenPair($decoded_data) && $lifetime;
+            $hash->{'.TOKEN'} = $decoded_data;
+            $hash->{TOKEN_LIFETIME} = gettimeofday() + $lifetime;
             $hash->{TOKEN_LIFETIME_HR} = localtime( $hash->{TOKEN_LIFETIME} );
             Log3 $name, 5,
                 "EaseeWallbox $name" . ": "
@@ -1408,6 +1473,23 @@ sub _tokenRefresh {
         }
     }
     return;
+}
+
+sub _validTokenPair {
+    my ($token) = @_;
+    return ref($token) eq 'HASH'
+      && defined($token->{accessToken}) && !ref($token->{accessToken}) && $token->{accessToken} =~ /\S/
+      && defined($token->{refreshToken}) && !ref($token->{refreshToken}) && $token->{refreshToken} =~ /\S/
+      && defined($token->{tokenType}) && !ref($token->{tokenType}) && $token->{tokenType} =~ /\S/;
+}
+
+sub _tokenLifetime {
+    my ($token) = @_;
+    return unless ref($token) eq 'HASH';
+    my $lifetime = $token->{expiresIn} // $token->{expires_in};
+    return unless defined($lifetime) && !ref($lifetime)
+      && $lifetime =~ /^\d+(?:\.\d+)?$/ && $lifetime > 0;
+    return $lifetime;
 }
 
 sub _encrypt {

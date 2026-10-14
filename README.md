@@ -45,10 +45,16 @@ The module exposes a wide range of readings, including:
 - **Basic information** – `charger_id`, `charger_name`, `site_id`, `site_key`, `circuit_id`.
 - **Charger configuration** – `isEnabled`, `isCablePermanentlyLocked`, `isAuthorizationRequired`, `isRemoteStartRequired`, `isSmartButtonEnabled`, `isLocalAuthorizationRequired`, `wiFiSSID`, `phaseModeId`, `phaseMode`, `maxChargerCurrent`, `ledStripBrightness`.
 - **Site configuration** – `cost_perKWh`, `cost_perKwhExcludeVat`, `cost_vat`, `cost_currency`.
-- **Charger state** – `operationModeCode`, `operationMode`, `online`, `power`, `current`, `dynamicCurrent`, `kWhInSession`, `latestPulse`, `reasonCodeForNoCurrent`, `reasonForNoCurrent`, `errorCode`, `fatalErrorCode`, `lifetimeEnergy`, `voltage`, `wifi_rssi`, `wifi_apEnabled`, `cell_rssi`.
+- **Charger state** – `operationModeCode`, `operationMode`, `online`, `power`, `current`, `dynamicCurrent`, `kWhInSession`, `latestPulse`, `reasonCodeForNoCurrent`, `reasonForNoCurrent`, `errorCode`, `fatalErrorCode`, `lifetimeEnergy`, `voltage`, `wifi_rssi`, `wifi_apEnabled`, `cell_rssi`. Some legacy readings are retained without a current observation source; see below.
 - **Current session** – `session_energy`, `session_start`, `session_end`, `session_chargeDurationInSeconds`, `session_firstEnergyTransfer`, `session_lastEnergyTransfer`, `session_pricePerKWH`, `session_chargingCost`, `session_id`.
 - **Dynamic current** – `dynamicCurrent_phase1`, `dynamicCurrent_phase2`, `dynamicCurrent_phase3`.
 - **Historic consumption** – `daily_1_consumption` … `daily_7_consumption`, `daily_1_cost` … `daily_7_cost`.
+
+Charger state is read from Easee's observation endpoint. The module currently maps observations 48 (`dynamicCurrent`), 96 (`reasonCodeForNoCurrent` and `reasonForNoCurrent`), 109 (`operationModeCode` and `operationMode`), 110 (`phase`), 114 (`current`), 119 (`errorCode`), 120 (`power` in kW), 121 (`kWhInSession`), 124 (`lifetimeEnergy` in kWh), 130 (`cell_rssi`), 132 (`wifi_rssi`) and 250 (`online`). Each mapped reading has a companion `<reading>_sourceTimestamp` containing the exact UTC timestamp supplied by Easee. A repeated timestamp is ignored, and an older observation cannot replace a newer value.
+
+Unknown operation-mode and no-current reason codes remain visible as `Unknown(<code>)` instead of leaving an outdated text label in place.
+
+`chargerStateStatus`, `chargerStateError` and `lastChargerStatePoll` report the observation request independently from other Easee API calls. An empty, malformed or unsuccessful observation response marks the state request as failed. Existing `latestPulse`, `voltage`, `fatalErrorCode` and `wifi_apEnabled` readings are retained for compatibility with previously stored values, but the observation API does not provide a verified source for them, so this module no longer updates them.
 
 ## License
 This module is distributed under the same license as FHEM itself.  Use at your own risk.
